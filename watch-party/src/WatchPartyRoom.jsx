@@ -1,21 +1,17 @@
 import React, { useState, useRef, useEffect } from "react";
-import ReactPlayer from "react-player";
 import Draggable from "react-draggable";
 import {
-  Play, Pause, Rewind, FastForward, Maximize, Minimize,
-  Mic, MicOff, Video, VideoOff, Link // <-- Added Link icon
+  Maximize, Minimize, Mic, MicOff, Video, VideoOff, Link
 } from "lucide-react";
 
 export default function WatchPartyRoom() {
   const containerRef = useRef(null);
-  const playerRef = useRef(null);
   const user1Ref = useRef(null);
   const user2Ref = useRef(null);
   const localVideoRef = useRef(null);
   const volumeBarRef = useRef(null);
 
   const [localStream, setLocalStream] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
@@ -24,28 +20,29 @@ export default function WatchPartyRoom() {
   const [cam1Pos, setCam1Pos] = useState({ x: 0, y: 0 });
   const [cam2Pos, setCam2Pos] = useState({ x: 0, y: 0 });
 
-  // NEW: State for dynamically loading videos
-  const [videoUrl, setVideoUrl] = useState("https://www.youtube.com/watch?v=LXb3EKWsInQ");
+  // NEW: State to hold just the 11-character YouTube ID
+  const [videoId, setVideoId] = useState("LXb3EKWsInQ");
   const [inputUrl, setInputUrl] = useState("");
 
-  const [duration, setDuration] = useState(0);
-  const [currentTime, setCurrentTime] = useState(0);
-
-  const handleProgress = (state) => {
-    setCurrentTime(state.playedSeconds);
+  // NEW: Helper function to extract the Video ID from any YouTube URL format
+  const extractVideoId = (url) => {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  // NEW: Function to handle URL submission
-  // NEW: Updated function to safely handle YouTube iframe swapping
   const handleUrlSubmit = (e) => {
     e.preventDefault(); 
     const newUrl = inputUrl.trim();
 
     if (newUrl !== "") {
-      // Set the new URL, clear the box, and force play immediately
-      setVideoUrl(newUrl);
-      setInputUrl(""); 
-      setIsPlaying(true); 
+      const extractedId = extractVideoId(newUrl);
+      if (extractedId) {
+        setVideoId(extractedId); // Save the clean ID
+        setInputUrl(""); // Clear the box
+      } else {
+        alert("Please enter a valid YouTube URL.");
+      }
     }
   };
 
@@ -145,10 +142,6 @@ export default function WatchPartyRoom() {
     }
   };
 
-  const togglePlayPause = () => setIsPlaying(!isPlaying);
-  const seekForward = () => playerRef.current?.seekTo(playerRef.current.getCurrentTime() + 5, "seconds");
-  const seekBackward = () => playerRef.current?.seekTo(playerRef.current.getCurrentTime() - 5, "seconds");
-
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current.requestFullscreen().catch(err => console.error(err));
@@ -164,10 +157,8 @@ export default function WatchPartyRoom() {
   }, []);
 
   return (
-    // NEW: Added an outer wrapper so the input bar sits nicely above the main grid
     <div className="w-full flex flex-col items-center gap-6 pb-10">
       
-      {/* NEW: YouTube URL Input Form (Automatically hidden by the browser when fullscreen is triggered) */}
       <form 
         onSubmit={handleUrlSubmit} 
         className="w-full max-w-[1600px] px-4 md:px-8 flex items-center gap-3"
@@ -207,84 +198,26 @@ export default function WatchPartyRoom() {
               : "relative flex-1 aspect-video bg-black rounded-xl shadow-2xl overflow-hidden"
           }
         >
-          <div className="absolute inset-0 w-full h-full pointer-events-none">
-            <ReactPlayer
-              key={videoUrl}
-              ref={playerRef}
-              src={videoUrl}
-              width="100%"
-              height="100%"
-              playing={isPlaying}
-              controls={true}
-              style={{ pointerEvents: "none" }}
-              onProgress={handleProgress}
-              onDuration={(duration) => setDuration(duration)}
-              progressInterval={500}
-              config={{
-                youtube: {
-                  playerVars: {
-                    origin: window.location.origin,
-                    autoplay: 1
-                  }
-                }
-              }}
-            />
+          {/* UPDATED: Removed ReactPlayer and replaced with a native iframe */}
+          <div className="absolute inset-0 w-full h-full">
+            <iframe
+              key={videoId} // Forces iframe to rebuild on new video
+              className="w-full h-full"
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&fs=0&modestbranding=1`}
+              title="YouTube video player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+              allowFullScreen={false} // Kept false so users must use our custom fullscreen button
+            ></iframe>
           </div>
 
-          <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/90 via-black/50 to-transparent px-6 pb-4 pt-10 transition-opacity duration-300 z-40 pointer-events-none">
-            {/* Video progress / seek bar */}
-            <div className="w-full mb-3 pointer-events-auto">
-              <input
-                type="range"
-                min="0"
-                max={duration || 0}
-                step="0.1"
-                value={Math.min(currentTime, duration || 0)}
-                onChange={(e) => {
-                  const time = Number(e.target.value);
-                  setCurrentTime(time);
-                  playerRef.current?.seekTo(time, "seconds");
-                }}
-                className="w-full h-1.5 cursor-pointer accent-blue-500"
-                aria-label="Video progress"
-              />
-            </div>
-
-            {/* Existing video controls */}
-            <div className="flex items-center gap-4 pointer-events-auto">
+          <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 via-black/20 to-transparent px-6 pb-4 pt-16 transition-opacity duration-300 z-40 pointer-events-none flex justify-end">
+            <div className="pointer-events-auto">
               <button
-                onClick={seekBackward}
+                onClick={toggleFullscreen}
                 className="text-white hover:text-gray-300 transition"
               >
-                <Rewind size={24} />
+                {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
               </button>
-
-              <button
-                onClick={togglePlayPause}
-                className="text-white hover:text-gray-300 transition"
-              >
-                {isPlaying ? (
-                  <Pause size={28} />
-                ) : (
-                  <Play size={28} fill="currentColor" />
-                )}
-              </button>
-
-              <button
-                onClick={seekForward}
-                className="text-white hover:text-gray-300 transition"
-              >
-                <FastForward size={24} />
-              </button>
-
-              <div className="ml-auto">
-                <button
-                  onClick={toggleFullscreen}
-                  className="text-white hover:text-gray-300 transition"
-                >
-                  {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
-                </button>
-              </div>
             </div>
           </div>
         </div>
