@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Draggable from "react-draggable";
 import Peer from "peerjs";
+import YouTube from "react-youtube";
 import {
   Maximize,
   Minimize,
@@ -14,6 +15,12 @@ import {
 } from "lucide-react";
 
 export default function WatchPartyRoom() {
+
+  const dataConnRef = useRef(null);
+  const playerRef = useRef(null);
+  const isRemoteActionRef = useRef(false); // Prevents infinite sync loops
+
+
   const containerRef = useRef(null);
   const user1Ref = useRef(null);
   const user2Ref = useRef(null);
@@ -21,6 +28,8 @@ export default function WatchPartyRoom() {
   const localVideoRef = useRef(null);
   const remoteVideoRef = useRef(null);
   const volumeBarRef = useRef(null);
+
+  
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -56,6 +65,38 @@ export default function WatchPartyRoom() {
   const peerInstance = useRef(null);
 
   // ============================================================
+  // SYNCHRONIZATION LOGIC
+  // ============================================================
+
+  const handleReceiveData = (data) => {
+    console.log("📥 Received sync data:", data);
+    
+    if (!playerRef.current) return;
+    
+    const player = playerRef.current.getInternalPlayer();
+    
+    // Set flag to true so our own player doesn't echo the command back
+    isRemoteActionRef.current = true; 
+
+    if (data.type === "LOAD_VIDEO") {
+      setVideoId(data.videoId);
+    } 
+    else if (data.type === "PLAY") {
+      player.seekTo(data.time, true);
+      player.playVideo();
+    } 
+    else if (data.type === "PAUSE") {
+      player.pauseVideo();
+      player.seekTo(data.time, true);
+    }
+
+    // Reset the flag after a short delay
+    setTimeout(() => {
+      isRemoteActionRef.current = false;
+    }, 500);
+  };
+
+  // ============================================================
   // YOUTUBE VIDEO
   // ============================================================
 
@@ -68,9 +109,12 @@ export default function WatchPartyRoom() {
     return match && match[2].length === 11 ? match[2] : null;
   };
 
+  // ============================================================
+  // 👇 REPLACE YOUR EXISTING handleUrlSubmit WITH THIS 👇
+  // ============================================================
+
   const handleUrlSubmit = (e) => {
     e.preventDefault();
-
     const newUrl = inputUrl.trim();
 
     if (newUrl !== "") {
@@ -79,11 +123,40 @@ export default function WatchPartyRoom() {
       if (extractedId) {
         setVideoId(extractedId);
         setInputUrl("");
+        
+        // Tell friend to load the new video
+        if (dataConnRef.current) {
+          dataConnRef.current.send({ type: "LOAD_VIDEO", videoId: extractedId });
+        }
       } else {
         alert("Please enter a valid YouTube URL.");
       }
     }
   };
+
+  // ============================================================
+  // 👇 ADD STEP 5 NEW FUNCTIONS HERE 👇
+  // ============================================================
+
+  const handlePlay = (e) => {
+    if (isRemoteActionRef.current) return; 
+
+    const currentTime = e.target.getCurrentTime();
+    if (dataConnRef.current) {
+      dataConnRef.current.send({ type: "PLAY", time: currentTime });
+    }
+  };
+
+  const handlePause = (e) => {
+    if (isRemoteActionRef.current) return;
+
+    const currentTime = e.target.getCurrentTime();
+    if (dataConnRef.current) {
+      dataConnRef.current.send({ type: "PAUSE", time: currentTime });
+    }
+  };
+
+  
 
   // ============================================================
   // WEBRTC + PEERJS INITIALIZATION
@@ -158,29 +231,7 @@ export default function WatchPartyRoom() {
               {
                 urls: "stun:stun1.l.google.com:19302",
               },
-              {
-                urls: "stun:stun.relay.metered.ca:80",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:80",
-                username: "b461f0d5bee907774c5ef65d",
-                credential: "qAiBN0l27YJTAiOu",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "b461f0d5bee907774c5ef65d",
-                credential: "qAiBN0l27YJTAiOu",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:443",
-                username: "b461f0d5bee907774c5ef65d",
-                credential: "qAiBN0l27YJTAiOu",
-              },
-              {
-                urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "b461f0d5bee907774c5ef65d",
-                credential: "qAiBN0l27YJTAiOu",
-              },
+              
             ],
           },
         });
@@ -200,6 +251,15 @@ export default function WatchPartyRoom() {
           console.log("=================================");
 
           setPeerId(id);
+        });
+
+        peer.on("connection", (conn) => {
+          console.log("🤝 Data connection established!");
+          dataConnRef.current = conn;
+          
+          conn.on("data", (data) => {
+            handleReceiveData(data);
+          });
         });
 
         // ========================================================
@@ -361,6 +421,20 @@ export default function WatchPartyRoom() {
     });
 
     const call = peerInstance.current.call(friendId.trim(), localStream);
+
+    const dataConn = peerInstance.current.connect(friendId.trim());
+    dataConnRef.current = dataConn;
+
+    dataConn.on("open", () => {
+      console.log("🤝 Data connection opened to friend!");
+      
+      dataConn.on("data", (data) => {
+        handleReceiveData(data);
+      });
+      
+      // If we are already watching a video, tell them to load it
+      dataConn.send({ type: "LOAD_VIDEO", videoId: videoId });
+    });
 
     if (!call) {
       console.error("❌ PeerJS did not create a call");
@@ -875,14 +949,24 @@ export default function WatchPartyRoom() {
               : "relative flex-1 aspect-video bg-black rounded-xl shadow-2xl overflow-hidden"
           }
         >
-          <div className="absolute inset-0 w-full h-full">
-            <iframe
-              key={videoId}
+          <div className="absolute inset-0 w-full h-full pointer-events-auto">
+            <YouTube
+              videoId={videoId}
+              ref={playerRef}
+              opts={{
+                width: "100%",
+                height: "100%",
+                playerVars: {
+                  autoplay: 1,
+                  modestbranding: 1,
+                  rel: 0,
+                  fs: 0,
+                },
+              }}
+              onPlay={handlePlay}
+              onPause={handlePause}
               className="w-full h-full"
-              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&fs=0&modestbranding=1`}
-              title="YouTube video player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen={false}
+              iframeClassName="w-full h-full"
             />
           </div>
           <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/80 via-black/20 to-transparent px-6 pb-4 pt-16 transition-opacity duration-300 z-40 pointer-events-none flex justify-end">
