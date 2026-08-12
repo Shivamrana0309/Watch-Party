@@ -83,26 +83,28 @@ export default function useWatchPartyCall({
                 urls: "stun:stun.l.google.com:19302",
               },
               // Add your TURN servers here
-              { urls: "stun:stun.relay.metered.ca:80" },
+              {
+                urls: "stun:stun.relay.metered.ca:80",
+              },
               {
                 urls: "turn:global.relay.metered.ca:80",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "c873961bf6b7217c8b0ffc38",
+                credential: "5vB+6jcC2jr8Ox6k",
               },
               {
                 urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "c873961bf6b7217c8b0ffc38",
+                credential: "5vB+6jcC2jr8Ox6k",
               },
               {
                 urls: "turn:global.relay.metered.ca:443",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "c873961bf6b7217c8b0ffc38",
+                credential: "5vB+6jcC2jr8Ox6k",
               },
               {
                 urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "c873961bf6b7217c8b0ffc38",
+                credential: "5vB+6jcC2jr8Ox6k",
               },
             ],
           },
