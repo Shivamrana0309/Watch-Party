@@ -42,31 +42,69 @@ export default function useWatchPartyCall({
           localVideoRef.current.srcObject = myStream;
         }
 
+        // peer = new Peer({
+        //   config: {
+        //     iceServers: [
+        //       { urls: "stun:stun.l.google.com:19302" },
+        //       { urls: "stun:stun1.l.google.com:19302" },
+        //       { urls: "stun:stun.relay.metered.ca:80" },
+        //       {
+        //         urls: "turn:global.relay.metered.ca:80",
+        //         username: "3867887f9b0e7dcad23a1153",
+        //         credential: "skyCdtxsV5voRyrp",
+        //       },
+        //       {
+        //         urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        //         username: "3867887f9b0e7dcad23a1153",
+        //         credential: "skyCdtxsV5voRyrp",
+        //       },
+        //       {
+        //         urls: "turn:global.relay.metered.ca:443",
+        //         username: "3867887f9b0e7dcad23a1153",
+        //         credential: "skyCdtxsV5voRyrp",
+        //       },
+        //       {
+        //         urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        //         username: "3867887f9b0e7dcad23a1153",
+        //         credential: "skyCdtxsV5voRyrp",
+        //       },
+        //     ],
+        //   },
+        // });
+
         peer = new Peer({
+          host: "watch-party-74e5.onrender.com", // Replace with your exact Render URL (no https://)
+          port: 443, // 443 is the standard port for secure HTTPS connections
+          path: "/myapp",
+          secure: true, // Required for Render's HTTPS
           config: {
             iceServers: [
-              { urls: "stun:stun.l.google.com:19302" },
-              { urls: "stun:stun1.l.google.com:19302" },
-              { urls: "stun:stun.relay.metered.ca:80" },
+              {
+                urls: "stun:stun.l.google.com:19302",
+              },
+              // Add your TURN servers here
+              {
+                urls: "stun:stun.relay.metered.ca:80",
+              },
               {
                 urls: "turn:global.relay.metered.ca:80",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "64b8605951c6fbecf5f36a3c",
+                credential: "NDJRflJyYG7qYLV4",
               },
               {
                 urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "64b8605951c6fbecf5f36a3c",
+                credential: "NDJRflJyYG7qYLV4",
               },
               {
                 urls: "turn:global.relay.metered.ca:443",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "64b8605951c6fbecf5f36a3c",
+                credential: "NDJRflJyYG7qYLV4",
               },
               {
                 urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "3867887f9b0e7dcad23a1153",
-                credential: "skyCdtxsV5voRyrp",
+                username: "64b8605951c6fbecf5f36a3c",
+                credential: "NDJRflJyYG7qYLV4",
               },
             ],
           },
