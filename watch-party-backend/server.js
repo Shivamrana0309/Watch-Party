@@ -10,38 +10,34 @@ app.use(cors());
 
 const PORT = process.env.PORT || 9000;
 
-// API endpoint to serve secure TURN credentials
+// API endpoint to serve secure TURN credentials using environment variables
 app.get("/api/turn-credentials", (req, res) => {
-  // Reading the exact keys from your Render environment variables
-  const username = process.env.username || process.env.TURN_USERNAME;
-  const credential = process.env.credential || process.env.TURN_PASSWORD;
+  const username = process.env.TURN_USERNAME;
+  const credential = process.env.TURN_CREDENTIAL;
+  const turnIp = process.env.TURN_IP;
 
   res.json({
     iceServers: [
-      // Google STUN fallback
+      // Google STUN fallback for quick local connections
       { urls: "stun:stun.l.google.com:19302" },
       
-      // Metered STUN
-      { urls: "stun:stun.relay.metered.ca:80" },
+      // Custom Azure Coturn Server (STUN / Base TURN)
+      { 
+        urls: `turn:${turnIp}:3478`, 
+        username: username, 
+        credential: credential 
+      },
       
-      // Metered TURN Servers (using the extracted credentials)
+      // Custom Azure Coturn Server (UDP Transport)
       { 
-        urls: "turn:global.relay.metered.ca:80", 
+        urls: `turn:${turnIp}:3478?transport=udp`, 
         username: username, 
         credential: credential 
       },
+      
+      // Custom Azure Coturn Server (TCP Transport to bypass strict firewalls)
       { 
-        urls: "turn:global.relay.metered.ca:80?transport=tcp", 
-        username: username, 
-        credential: credential 
-      },
-      { 
-        urls: "turn:global.relay.metered.ca:443", 
-        username: username, 
-        credential: credential 
-      },
-      { 
-        urls: "turns:global.relay.metered.ca:443?transport=tcp", 
+        urls: `turn:${turnIp}:3478?transport=tcp`, 
         username: username, 
         credential: credential 
       },
