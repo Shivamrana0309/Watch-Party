@@ -79,33 +79,38 @@ export default function useWatchPartyCall({
           secure: true, // Required for Render's HTTPS
           config: {
             iceServers: [
+              // {
+              //   urls: "stun:stun.l.google.com:19302",
+              // },
               {
-                urls: "stun:stun.l.google.com:19302",
-              },
+                urls: "turn:free.expressturn.com:3478",
+                username: "000000002102218886",
+                credential: "n4h/C0cp9y29VAg2E0yhasXv/NI="
+              }
               // Add your TURN servers here
-              {
-                urls: "stun:stun.relay.metered.ca:80",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:80",
-                username: "64b8605951c6fbecf5f36a3c",
-                credential: "NDJRflJyYG7qYLV4",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:80?transport=tcp",
-                username: "64b8605951c6fbecf5f36a3c",
-                credential: "NDJRflJyYG7qYLV4",
-              },
-              {
-                urls: "turn:global.relay.metered.ca:443",
-                username: "64b8605951c6fbecf5f36a3c",
-                credential: "NDJRflJyYG7qYLV4",
-              },
-              {
-                urls: "turns:global.relay.metered.ca:443?transport=tcp",
-                username: "64b8605951c6fbecf5f36a3c",
-                credential: "NDJRflJyYG7qYLV4",
-              },
+              // {
+              //   urls: "stun:stun.relay.metered.ca:80",
+              // },
+              // {
+              //   urls: "turn:global.relay.metered.ca:80",
+              //   username: "64b8605951c6fbecf5f36a3c",
+              //   credential: "NDJRflJyYG7qYLV4",
+              // },
+              // {
+              //   urls: "turn:global.relay.metered.ca:80?transport=tcp",
+              //   username: "64b8605951c6fbecf5f36a3c",
+              //   credential: "NDJRflJyYG7qYLV4",
+              // },
+              // {
+              //   urls: "turn:global.relay.metered.ca:443",
+              //   username: "64b8605951c6fbecf5f36a3c",
+              //   credential: "NDJRflJyYG7qYLV4",
+              // },
+              // {
+              //   urls: "turns:global.relay.metered.ca:443?transport=tcp",
+              //   username: "64b8605951c6fbecf5f36a3c",
+              //   credential: "NDJRflJyYG7qYLV4",
+              // },
             ],
           },
         });
