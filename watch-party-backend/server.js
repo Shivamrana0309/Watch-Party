@@ -12,30 +12,23 @@ const PORT = process.env.PORT || 9000;
 
 // API endpoint to serve secure TURN credentials using environment variables
 app.get("/api/turn-credentials", (req, res) => {
-  const username = process.env.TURN_USERNAME;
-  const credential = process.env.TURN_CREDENTIAL;
-  const turnIp = process.env.TURN_IP;
+  const username = process.env.TURN_USERNAME || "watchparty";
+  const credential = process.env.TURN_CREDENTIAL || "SuperSecretPass123";
+  const turnIp = process.env.TURN_IP || "20.197.58.178";
 
   res.json({
     iceServers: [
-      // Google STUN fallback for quick local connections
       { urls: "stun:stun.l.google.com:19302" },
-      
-      // Custom Azure Coturn Server (STUN / Base TURN)
       { 
         urls: `turn:${turnIp}:3478`, 
         username: username, 
         credential: credential 
       },
-      
-      // Custom Azure Coturn Server (UDP Transport)
       { 
         urls: `turn:${turnIp}:3478?transport=udp`, 
         username: username, 
         credential: credential 
       },
-      
-      // Custom Azure Coturn Server (TCP Transport to bypass strict firewalls)
       { 
         urls: `turn:${turnIp}:3478?transport=tcp`, 
         username: username, 
