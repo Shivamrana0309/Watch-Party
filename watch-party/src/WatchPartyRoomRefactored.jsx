@@ -11,6 +11,7 @@ import {
   Link,
   Copy,
   PhoneCall,
+  PhoneOff,
   CheckCircle2,
 } from "lucide-react";
 import useWatchPartyVideo from "./hooks/useWatchPartyVideo";
@@ -55,9 +56,10 @@ export default function WatchPartyRoomRefactored() {
     toggleLocalMic,
     toggleLocalCam,
     callFriend,
-    incomingCall,
     acceptCall,
     rejectCall,
+    leaveCall,
+    incomingCall,
     callStatus,
     isConnected,
     activeRoomId,
@@ -70,7 +72,6 @@ export default function WatchPartyRoomRefactored() {
     volumeBarRef,
   });
 
-  // Display the shared active room ID when connected, or local ID if waiting
   const displayedRoomId = isConnected ? activeRoomId : peerId;
 
   return (
@@ -110,9 +111,15 @@ export default function WatchPartyRoomRefactored() {
 
         <div className="friend-connect-panel">
           {isConnected ? (
-            <div className="connected-badge">
-              <CheckCircle2 size={18} className="text-green-600" />
-              <span>Connected in Room <strong>{activeRoomId}</strong></span>
+            <div className="connected-panel-wrap">
+              <div className="connected-badge">
+                <CheckCircle2 size={18} className="text-green-600" />
+                <span>Connected in Room <strong>{activeRoomId}</strong></span>
+              </div>
+              <button onClick={leaveCall} className="leave-btn" title="Leave Call">
+                <PhoneOff size={16} />
+                Leave Call
+              </button>
             </div>
           ) : (
             <>
@@ -185,7 +192,7 @@ export default function WatchPartyRoomRefactored() {
             isFullscreen ? "camera-column is-fullscreen" : "camera-column"
           }
         >
-          {/* User 1: Local Video & Interactive Controls */}
+          {/* Local Feed */}
           <Draggable
             bounds="parent"
             nodeRef={user1Ref}
@@ -242,7 +249,7 @@ export default function WatchPartyRoomRefactored() {
             </div>
           </Draggable>
 
-          {/* User 2: Friend Video & Read-Only Status Indicators */}
+          {/* Friend Feed */}
           <Draggable
             bounds="parent"
             nodeRef={user2Ref}
@@ -285,7 +292,6 @@ export default function WatchPartyRoomRefactored() {
                 </div>
               </div>
 
-              {/* Non-clickable media indicators synced in real-time */}
               <div className="media-controls media-controls--friend">
                 <div
                   className={`media-indicator-badge ${
