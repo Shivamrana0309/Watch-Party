@@ -1,3 +1,4 @@
+require("dotenv").config();
 const express = require("express");
 const { ExpressPeerServer } = require("peer");
 const cors = require("cors");
@@ -10,6 +11,19 @@ app.use(cors());
 // Use the port provided by Render, or 9000 for local testing
 const PORT = process.env.PORT || 9000;
 
+// API endpoint to serve secure TURN credentials
+app.get("/api/turn-credentials", (req, res) => {
+  res.json({
+    iceServers: [
+      {
+        urls: process.env.TURN_URL,
+        username: process.env.TURN_USERNAME,
+        credential: process.env.TURN_PASSWORD,
+      },
+    ],
+  });
+});
+
 const server = app.listen(PORT, () => {
   console.log(`✅ Signaling Server running on port ${PORT}`);
 });
@@ -17,13 +31,13 @@ const server = app.listen(PORT, () => {
 // Initialize the PeerJS server
 const peerServer = ExpressPeerServer(server, {
   debug: true,
-  path: "/myapp", // Matches the path we set in your React app earlier
+  path: "/myapp", 
 });
 
 // Mount the PeerJS server to the root route
 app.use("/", peerServer);
 
-// Health check endpoint (Useful for keeping Render awake and checking uptime)
+// Health check endpoint 
 app.get("/health", (req, res) => {
   res.status(200).send("PeerJS Server is healthy and running!");
 });
