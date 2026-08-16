@@ -16,7 +16,19 @@ export default function useWatchPartyCall({
   const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
   const [user2Media, setUser2Media] = useState({ mic: true, cam: true });
 
+  // New States for Call Handshake
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [callStatus, setCallStatus] = useState("");
+
   const peerInstance = useRef(null);
+  const videoIdRef = useRef(videoId);
+
+  useEffect(() => {
+    videoIdRef.current = videoId;
+  }, [videoId]);
+
+  // Generate a random 6-character uppercase alphanumeric ID
+  const generateShortId = () => Math.random().toString(36).substring(2, 8).toUpperCase();
 
   useEffect(() => {
     let myStream;
@@ -42,76 +54,21 @@ export default function useWatchPartyCall({
           localVideoRef.current.srcObject = myStream;
         }
 
-        // peer = new Peer({
-        //   config: {
-        //     iceServers: [
-        //       { urls: "stun:stun.l.google.com:19302" },
-        //       { urls: "stun:stun1.l.google.com:19302" },
-        //       { urls: "stun:stun.relay.metered.ca:80" },
-        //       {
-        //         urls: "turn:global.relay.metered.ca:80",
-        //         username: "3867887f9b0e7dcad23a1153",
-        //         credential: "skyCdtxsV5voRyrp",
-        //       },
-        //       {
-        //         urls: "turn:global.relay.metered.ca:80?transport=tcp",
-        //         username: "3867887f9b0e7dcad23a1153",
-        //         credential: "skyCdtxsV5voRyrp",
-        //       },
-        //       {
-        //         urls: "turn:global.relay.metered.ca:443",
-        //         username: "3867887f9b0e7dcad23a1153",
-        //         credential: "skyCdtxsV5voRyrp",
-        //       },
-        //       {
-        //         urls: "turns:global.relay.metered.ca:443?transport=tcp",
-        //         username: "3867887f9b0e7dcad23a1153",
-        //         credential: "skyCdtxsV5voRyrp",
-        //       },
-        //     ],
-        //   },
-        // });
+        // 1. Fetch secure TURN credentials from your backend
+        const res = await fetch("https://watch-party-74e5.onrender.com/api/turn-credentials");
+        const turnData = await res.json();
 
-        peer = new Peer({
-          host: "watch-party-74e5.onrender.com", // Replace with your exact Render URL (no https://)
-          port: 443, // 443 is the standard port for secure HTTPS connections
+        // 2. Generate short room ID
+        const shortId = generateShortId();
+
+        // 3. Initialize Peer with fetched credentials and short ID
+        peer = new Peer(shortId, {
+          host: "watch-party-74e5.onrender.com",
+          port: 443,
           path: "/myapp",
-          secure: true, // Required for Render's HTTPS
+          secure: true,
           config: {
-            iceServers: [
-              // {
-              //   urls: "stun:stun.l.google.com:19302",
-              // },
-              {
-                urls: "turn:free.expressturn.com:3478",
-                username: "000000002102218886",
-                credential: "n4h/C0cp9y29VAg2E0yhasXv/NI="
-              }
-              // Add your TURN servers here
-              // {
-              //   urls: "stun:stun.relay.metered.ca:80",
-              // },
-              // {
-              //   urls: "turn:global.relay.metered.ca:80",
-              //   username: "64b8605951c6fbecf5f36a3c",
-              //   credential: "NDJRflJyYG7qYLV4",
-              // },
-              // {
-              //   urls: "turn:global.relay.metered.ca:80?transport=tcp",
-              //   username: "64b8605951c6fbecf5f36a3c",
-              //   credential: "NDJRflJyYG7qYLV4",
-              // },
-              // {
-              //   urls: "turn:global.relay.metered.ca:443",
-              //   username: "64b8605951c6fbecf5f36a3c",
-              //   credential: "NDJRflJyYG7qYLV4",
-              // },
-              // {
-              //   urls: "turns:global.relay.metered.ca:443?transport=tcp",
-              //   username: "64b8605951c6fbecf5f36a3c",
-              //   credential: "NDJRflJyYG7qYLV4",
-              // },
-            ],
+            iceServers: turnData.iceServers,
           },
         });
 
@@ -122,17 +79,20 @@ export default function useWatchPartyCall({
           setPeerId(id);
         });
 
+        // 4. Handle incoming Data Connections (The Handshake)
         peer.on("connection", (conn) => {
-          dataConnRef.current = conn;
-
           conn.on("data", (data) => {
-            onReceiveData(data);
+            if (data.type === "CALL_REQUEST") {
+              setIncomingCall({ callerId: data.callerId, conn });
+            } else {
+              onReceiveData(data);
+            }
           });
         });
 
+        // 5. Auto-answer media call once handshake is accepted
         peer.on("call", (call) => {
           if (!myStream) return;
-
           call.answer(myStream);
 
           call.on("stream", (userVideoStream) => {
@@ -140,8 +100,8 @@ export default function useWatchPartyCall({
             setRemoteStream(userVideoStream);
           });
         });
-      } catch {
-        return;
+      } catch (err) {
+        console.error("Initialization error:", err);
       }
     };
 
@@ -149,20 +109,14 @@ export default function useWatchPartyCall({
 
     return () => {
       isMounted = false;
-
-      if (myStream) {
-        myStream.getTracks().forEach((track) => track.stop());
-      }
-
-      if (peer) {
-        peer.destroy();
-      }
+      if (myStream) myStream.getTracks().forEach((track) => track.stop());
+      if (peer) peer.destroy();
     };
-  }, [dataConnRef, onReceiveData, localVideoRef]);
+  }, [onReceiveData, localVideoRef]);
 
+  // Handle remote stream and audio (Unchanged)
   useEffect(() => {
     if (!remoteStream) return;
-
     const video = remoteVideoRef.current;
     if (!video) return;
 
@@ -170,32 +124,15 @@ export default function useWatchPartyCall({
     video.srcObject = remoteStream;
 
     videoTracks.forEach((track) => {
-      track.onunmute = () => {
-        video.play().catch(() => {});
-      };
-
+      track.onunmute = () => video.play().catch(() => {});
       track.onmute = () => {};
       track.onended = () => {};
     });
 
-    video.onloadedmetadata = () => {
-      video.play().catch(() => {});
-    };
-
-    const timer = setTimeout(() => {}, 3000);
-    const timer2 = setTimeout(() => {}, 8000);
+    video.onloadedmetadata = () => video.play().catch(() => {});
 
     return () => {
-      clearTimeout(timer);
-      clearTimeout(timer2);
-
       video.onloadedmetadata = null;
-      video.oncanplay = null;
-      video.onplaying = null;
-      video.onwaiting = null;
-      video.onstalled = null;
-      video.onerror = null;
-
       videoTracks.forEach((track) => {
         track.onunmute = null;
         track.onmute = null;
@@ -204,6 +141,7 @@ export default function useWatchPartyCall({
     };
   }, [remoteStream, remoteVideoRef]);
 
+  // Volume Meter Logic (Unchanged)
   useEffect(() => {
     let audioContext;
     let analyser;
@@ -212,7 +150,6 @@ export default function useWatchPartyCall({
 
     if (localStream && user1Media.mic) {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
-
       audioContext = new AudioContext();
       analyser = audioContext.createAnalyser();
       analyser.smoothingTimeConstant = 0.7;
@@ -225,19 +162,12 @@ export default function useWatchPartyCall({
 
       const updateVolume = () => {
         analyser.getByteFrequencyData(dataArray);
-
         let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) {
-          sum += dataArray[i];
-        }
-
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
         const average = sum / dataArray.length;
         const volumePercentage = Math.min(average * 1.5, 100);
 
-        if (volumeBarRef.current) {
-          volumeBarRef.current.style.height = `${volumePercentage}%`;
-        }
-
+        if (volumeBarRef.current) volumeBarRef.current.style.height = `${volumePercentage}%`;
         animationFrameId = requestAnimationFrame(updateVolume);
       };
 
@@ -247,122 +177,85 @@ export default function useWatchPartyCall({
     }
 
     return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-
-      if (audioContext && audioContext.state !== "closed") {
-        audioContext.close();
-      }
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (audioContext && audioContext.state !== "closed") audioContext.close();
     };
   }, [localStream, user1Media.mic, volumeBarRef]);
 
   const toggleLocalMic = () => {
     setUser1Media((prev) => {
       const newState = !prev.mic;
-
       if (localStream) {
-        localStream.getAudioTracks().forEach((track) => {
-          track.enabled = newState;
-        });
+        localStream.getAudioTracks().forEach((track) => (track.enabled = newState));
       }
-
-      return {
-        ...prev,
-        mic: newState,
-      };
+      return { ...prev, mic: newState };
     });
   };
 
   const toggleLocalCam = () => {
     setUser1Media((prev) => {
       const newState = !prev.cam;
-
       if (localStream) {
-        localStream.getVideoTracks().forEach((track) => {
-          track.enabled = newState;
-        });
+        localStream.getVideoTracks().forEach((track) => (track.enabled = newState));
       }
-
-      return {
-        ...prev,
-        cam: newState,
-      };
+      return { ...prev, cam: newState };
     });
   };
 
+  // Initiates request to friend
   const callFriend = () => {
-    if (friendId.trim() === "") {
-      alert("Please enter a Friend's ID first!");
-      return;
-    }
+    const friendIdClean = friendId.trim().toUpperCase();
+    if (friendIdClean === "") return alert("Please enter a Friend's ID first!");
+    if (!peerInstance.current || !localStream) return alert("System not ready yet.");
 
-    if (!peerInstance.current) {
-      alert("Peer connection is not ready yet. Please wait a few seconds.");
-      return;
-    }
-
-    if (!localStream) {
-      alert("Camera/microphone is not ready yet.");
-      return;
-    }
-
-    const call = peerInstance.current.call(friendId.trim(), localStream);
-
-    const dataConn = peerInstance.current.connect(friendId.trim());
+    setCallStatus("Ringing...");
+    const dataConn = peerInstance.current.connect(friendIdClean);
     dataConnRef.current = dataConn;
 
     dataConn.on("open", () => {
+      dataConn.send({ type: "CALL_REQUEST", callerId: peerId });
+
       dataConn.on("data", (data) => {
-        onReceiveData(data);
+        if (data.type === "CALL_ACCEPTED") {
+          setCallStatus("Accepted! Connecting...");
+          
+          const call = peerInstance.current.call(friendIdClean, localStream);
+          call.on("stream", (userVideoStream) => setRemoteStream(userVideoStream));
+          
+          dataConn.send({ type: "LOAD_VIDEO", videoId: videoIdRef.current });
+          setTimeout(() => setCallStatus(""), 3000);
+        } else if (data.type === "CALL_REJECTED") {
+          setCallStatus("Call rejected by friend.");
+          dataConnRef.current = null;
+          setTimeout(() => setCallStatus(""), 4000);
+        } else {
+          onReceiveData(data);
+        }
       });
-
-      dataConn.send({ type: "LOAD_VIDEO", videoId });
     });
+  };
 
-    if (!call) {
-      return;
+  // Receiver accepts the call
+  const acceptCall = () => {
+    if (incomingCall) {
+      dataConnRef.current = incomingCall.conn;
+      incomingCall.conn.send({ type: "CALL_ACCEPTED" });
+      setIncomingCall(null);
     }
+  };
 
-    const monitorPeerConnection = () => {
-      if (!call.peerConnection) {
-        return;
-      }
-
-      const pc = call.peerConnection;
-      pc.onconnectionstatechange = () => {};
-      pc.oniceconnectionstatechange = () => {};
-      pc.onicegatheringstatechange = () => {};
-    };
-
-    setTimeout(monitorPeerConnection, 1000);
-
-    call.on("stream", (userVideoStream) => {
-      const videoTracks = userVideoStream.getVideoTracks();
-
-      if (videoTracks.length === 0) {
-        return;
-      }
-
-      setRemoteStream(userVideoStream);
-    });
-
-    call.on("close", () => {});
-    call.on("error", () => {});
+  // Receiver rejects the call
+  const rejectCall = () => {
+    if (incomingCall) {
+      incomingCall.conn.send({ type: "CALL_REJECTED" });
+      setIncomingCall(null);
+    }
   };
 
   return {
-    localStream,
-    remoteStream,
-    peerId,
-    friendId,
-    setFriendId,
-    user1Media,
-    setUser1Media,
-    user2Media,
-    setUser2Media,
-    toggleLocalMic,
-    toggleLocalCam,
-    callFriend,
+    localStream, remoteStream, peerId, friendId, setFriendId,
+    user1Media, setUser1Media, user2Media, setUser2Media,
+    toggleLocalMic, toggleLocalCam, callFriend,
+    incomingCall, acceptCall, rejectCall, callStatus
   };
 }
