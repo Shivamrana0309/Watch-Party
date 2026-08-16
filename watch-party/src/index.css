@@ -537,3 +537,36 @@
 .reject-btn:hover {
   background-color: #dc2626;
 }
+
+/* Non-clickable synced media indicators for friend */
+.media-indicator-badge {
+  padding: 0.5rem;
+  border-radius: 9999px;
+  color: #fff;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+  cursor: default;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.media-indicator-badge.is-on {
+  background: rgba(55, 65, 81, 0.8);
+}
+
+.media-indicator-badge.is-off {
+  background: rgba(239, 68, 68, 0.9);
+}
+
+/* Connected Room Indicator Panel */
+.connected-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  color: #15803d;
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+}

@@ -11,6 +11,7 @@ import {
   Link,
   Copy,
   PhoneCall,
+  CheckCircle2,
 } from "lucide-react";
 import useWatchPartyVideo from "./hooks/useWatchPartyVideo";
 import useWatchPartyCall from "./hooks/useWatchPartyCall";
@@ -51,14 +52,15 @@ export default function WatchPartyRoomRefactored() {
     setFriendId,
     user1Media,
     user2Media,
-    setUser2Media,
     toggleLocalMic,
     toggleLocalCam,
     callFriend,
-    incomingCall,  // NEW
-    acceptCall,    // NEW
-    rejectCall,    // NEW
-    callStatus     // NEW
+    incomingCall,
+    acceptCall,
+    rejectCall,
+    callStatus,
+    isConnected,
+    activeRoomId,
   } = useWatchPartyCall({
     dataConnRef,
     onReceiveData: handleReceiveData,
@@ -67,6 +69,9 @@ export default function WatchPartyRoomRefactored() {
     remoteVideoRef,
     volumeBarRef,
   });
+
+  // Display the shared active room ID when connected, or local ID if waiting
+  const displayedRoomId = isConnected ? activeRoomId : peerId;
 
   return (
     <div className="watch-party-room">
@@ -90,52 +95,66 @@ export default function WatchPartyRoomRefactored() {
 
       <div className="connection-row">
         <div className="room-id-panel">
-          <span className="room-id-label">Your Room ID:</span>
-          <code className="room-id-code">{peerId || "Generating..."}</code>
+          <span className="room-id-label">
+            {isConnected ? "Active Room ID:" : "Your Room ID:"}
+          </span>
+          <code className="room-id-code">{displayedRoomId || "Generating..."}</code>
           <button
-            onClick={() => navigator.clipboard.writeText(peerId)}
+            onClick={() => navigator.clipboard.writeText(displayedRoomId)}
             className="copy-id-btn"
-            title="Copy ID"
+            title="Copy Room ID"
           >
             <Copy size={16} />
           </button>
         </div>
 
         <div className="friend-connect-panel">
-          <input
-            type="text"
-            placeholder="Paste Friend's ID here..."
-            value={friendId}
-            onChange={(e) => setFriendId(e.target.value)}
-            className="friend-id-input"
-            style={{ textTransform: "uppercase" }}
-          />
-          <button onClick={callFriend} className="connect-btn">
-            <PhoneCall size={16} />
-            Connect
-          </button>
+          {isConnected ? (
+            <div className="connected-badge">
+              <CheckCircle2 size={18} className="text-green-600" />
+              <span>Connected in Room <strong>{activeRoomId}</strong></span>
+            </div>
+          ) : (
+            <>
+              <input
+                type="text"
+                placeholder="Paste Friend's ID here..."
+                value={friendId}
+                onChange={(e) => setFriendId(e.target.value)}
+                className="friend-id-input"
+                style={{ textTransform: "uppercase" }}
+              />
+              <button onClick={callFriend} className="connect-btn">
+                <PhoneCall size={16} />
+                Connect
+              </button>
+            </>
+          )}
         </div>
       </div>
 
-      {/* NEW: Caller Status Feedback */}
-      {callStatus && (
-        <div className="call-status-alert">
-          {callStatus}
-        </div>
-      )}
+      {callStatus && <div className="call-status-alert">{callStatus}</div>}
 
-      {/* NEW: Incoming Call Request Prompt */}
       {incomingCall && (
         <div className="incoming-call-modal">
-          <span>Incoming request from: <strong>{incomingCall.callerId}</strong></span>
+          <span>
+            Incoming request from: <strong>{incomingCall.callerId}</strong>
+          </span>
           <div className="incoming-call-actions">
-            <button onClick={acceptCall} className="accept-btn">Accept</button>
-            <button onClick={rejectCall} className="reject-btn">Reject</button>
+            <button onClick={acceptCall} className="accept-btn">
+              Accept
+            </button>
+            <button onClick={rejectCall} className="reject-btn">
+              Reject
+            </button>
           </div>
         </div>
       )}
 
-      <div ref={containerRef} className={isFullscreen ? "video-shell is-fullscreen" : "video-shell"}>
+      <div
+        ref={containerRef}
+        className={isFullscreen ? "video-shell is-fullscreen" : "video-shell"}
+      >
         <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
           <div className="youtube-host">
             <YouTube
@@ -161,7 +180,12 @@ export default function WatchPartyRoomRefactored() {
           </div>
         </div>
 
-        <div className={isFullscreen ? "camera-column is-fullscreen" : "camera-column"}>
+        <div
+          className={
+            isFullscreen ? "camera-column is-fullscreen" : "camera-column"
+          }
+        >
+          {/* User 1: Local Video & Interactive Controls */}
           <Draggable
             bounds="parent"
             nodeRef={user1Ref}
@@ -169,14 +193,21 @@ export default function WatchPartyRoomRefactored() {
             position={isFullscreen ? cam1Pos : { x: 0, y: 0 }}
             onDrag={(e, data) => setCam1Pos({ x: data.x, y: data.y })}
           >
-            <div ref={user1Ref} className={`video-card video-card--self ${isFullscreen ? "is-fullscreen" : "is-inline"}`}>
+            <div
+              ref={user1Ref}
+              className={`video-card video-card--self ${
+                isFullscreen ? "is-fullscreen" : "is-inline"
+              }`}
+            >
               <div className="video-surface">
                 <video
                   ref={localVideoRef}
                   autoPlay
                   playsInline
                   muted
-                  className={`video-feed video-feed--local ${user1Media.cam ? "is-visible" : "is-hidden"}`}
+                  className={`video-feed video-feed--local ${
+                    user1Media.cam ? "is-visible" : "is-hidden"
+                  }`}
                 />
                 {!user1Media.cam && <VideoOff className="video-off-icon" />}
                 <div className="participant-tag-wrap">
@@ -190,14 +221,20 @@ export default function WatchPartyRoomRefactored() {
                 <button
                   onClick={toggleLocalMic}
                   onMouseDown={(e) => e.stopPropagation()}
-                  className={`media-toggle-btn ${user1Media.mic ? "is-on" : "is-off"}`}
+                  className={`media-toggle-btn ${
+                    user1Media.mic ? "is-on" : "is-off"
+                  }`}
+                  title={user1Media.mic ? "Mute Microphone" : "Unmute Microphone"}
                 >
                   {user1Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
                 </button>
                 <button
                   onClick={toggleLocalCam}
                   onMouseDown={(e) => e.stopPropagation()}
-                  className={`media-toggle-btn ${user1Media.cam ? "is-on" : "is-off"}`}
+                  className={`media-toggle-btn ${
+                    user1Media.cam ? "is-on" : "is-off"
+                  }`}
+                  title={user1Media.cam ? "Turn Off Camera" : "Turn On Camera"}
                 >
                   {user1Media.cam ? <Video size={18} /> : <VideoOff size={18} />}
                 </button>
@@ -205,6 +242,7 @@ export default function WatchPartyRoomRefactored() {
             </div>
           </Draggable>
 
+          {/* User 2: Friend Video & Read-Only Status Indicators */}
           <Draggable
             bounds="parent"
             nodeRef={user2Ref}
@@ -212,13 +250,20 @@ export default function WatchPartyRoomRefactored() {
             position={isFullscreen ? cam2Pos : { x: 0, y: 0 }}
             onDrag={(e, data) => setCam2Pos({ x: data.x, y: data.y })}
           >
-            <div ref={user2Ref} className={`video-card video-card--friend ${isFullscreen ? "is-fullscreen" : "is-inline"}`}>
+            <div
+              ref={user2Ref}
+              className={`video-card video-card--friend ${
+                isFullscreen ? "is-fullscreen" : "is-inline"
+              }`}
+            >
               <div className="video-surface video-surface--friend">
                 <video
                   ref={remoteVideoRef}
                   autoPlay
                   playsInline
-                  className="video-feed video-feed--remote"
+                  className={`video-feed video-feed--remote ${
+                    remoteStream && user2Media.cam ? "is-visible" : "is-hidden"
+                  }`}
                 />
 
                 {!remoteStream && (
@@ -227,26 +272,37 @@ export default function WatchPartyRoomRefactored() {
                     <span className="waiting-text">Waiting for friend...</span>
                   </div>
                 )}
+
+                {remoteStream && !user2Media.cam && (
+                  <div className="waiting-overlay">
+                    <VideoOff className="waiting-icon" />
+                    <span className="waiting-text">Friend's camera is off</span>
+                  </div>
+                )}
+
                 <div className="participant-tag-wrap participant-tag-wrap--friend">
                   <span className="participant-tag">Friend</span>
                 </div>
               </div>
 
+              {/* Non-clickable media indicators synced in real-time */}
               <div className="media-controls media-controls--friend">
-                <button
-                  onClick={() => setUser2Media({ ...user2Media, mic: !user2Media.mic })}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className={`media-toggle-btn ${user2Media.mic ? "is-on" : "is-off"}`}
+                <div
+                  className={`media-indicator-badge ${
+                    user2Media.mic ? "is-on" : "is-off"
+                  }`}
+                  title={user2Media.mic ? "Friend's Mic is On" : "Friend is Muted"}
                 >
                   {user2Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
-                </button>
-                <button
-                  onClick={() => setUser2Media({ ...user2Media, cam: !user2Media.cam })}
-                  onMouseDown={(e) => e.stopPropagation()}
-                  className={`media-toggle-btn ${user2Media.cam ? "is-on" : "is-off"}`}
+                </div>
+                <div
+                  className={`media-indicator-badge ${
+                    user2Media.cam ? "is-on" : "is-off"
+                  }`}
+                  title={user2Media.cam ? "Friend's Camera is On" : "Friend's Camera is Off"}
                 >
                   {user2Media.cam ? <Video size={18} /> : <VideoOff size={18} />}
-                </button>
+                </div>
               </div>
             </div>
           </Draggable>
