@@ -10,15 +10,16 @@ const PORT = process.env.PORT || 9000;
 app.get("/api/turn-credentials", (req, res) => {
   res.json({
     iceServers: [
-      // 1. First, try free Google STUN servers to bypass basic NATs
       { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-      // 2. If STUN fails, fallback to your TURN server
-      {
-        urls: process.env.TURN_URL,
-        username: process.env.TURN_USERNAME,
-        credential: process.env.TURN_PASSWORD,
-      },
+      
+      // Metered STUN
+      { urls: "stun:stun.relay.metered.ca:80" },
+      
+      // Metered TURN Servers (Testing all ports and protocols)
+      { urls: "turn:global.relay.metered.ca:80", username, credential },
+      { urls: "turn:global.relay.metered.ca:80?transport=tcp", username, credential },
+      { urls: "turn:global.relay.metered.ca:443", username, credential },
+      { urls: "turns:global.relay.metered.ca:443?transport=tcp", username, credential },
     ],
   });
 });
