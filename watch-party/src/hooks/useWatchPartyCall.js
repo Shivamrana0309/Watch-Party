@@ -203,21 +203,63 @@ export default function useWatchPartyCall({
   };
 
   // Initiates request to friend
+  // const callFriend = () => {
+  //   const friendIdClean = friendId.trim().toUpperCase();
+  //   if (friendIdClean === "") return alert("Please enter a Friend's ID first!");
+  //   if (!peerInstance.current || !localStream) return alert("System not ready yet.");
+
+  //   setCallStatus("Ringing...");
+  //   const dataConn = peerInstance.current.connect(friendIdClean);
+  //   dataConnRef.current = dataConn;
+
+  //   dataConn.on("open", () => {
+  //     dataConn.send({ type: "CALL_REQUEST", callerId: peerId });
+
+  //     dataConn.on("data", (data) => {
+  //       if (data.type === "CALL_ACCEPTED") {
+  //         setCallStatus("Accepted! Connecting...");
+          
+  //         const call = peerInstance.current.call(friendIdClean, localStream);
+  //         call.on("stream", (userVideoStream) => setRemoteStream(userVideoStream));
+          
+  //         dataConn.send({ type: "LOAD_VIDEO", videoId: videoIdRef.current });
+  //         setTimeout(() => setCallStatus(""), 3000);
+  //       } else if (data.type === "CALL_REJECTED") {
+  //         setCallStatus("Call rejected by friend.");
+  //         dataConnRef.current = null;
+  //         setTimeout(() => setCallStatus(""), 4000);
+  //       } else {
+  //         onReceiveData(data);
+  //       }
+  //     });
+  //   });
+  // };
   const callFriend = () => {
     const friendIdClean = friendId.trim().toUpperCase();
     if (friendIdClean === "") return alert("Please enter a Friend's ID first!");
     if (!peerInstance.current || !localStream) return alert("System not ready yet.");
 
-    setCallStatus("Ringing...");
+    // Step 1: Connecting to signaling server
+    setCallStatus("Negotiating network connection...");
+    
     const dataConn = peerInstance.current.connect(friendIdClean);
     dataConnRef.current = dataConn;
 
+    // Add an error listener to catch network failures
+    dataConn.on("error", (err) => {
+      console.error("Data Connection Error:", err);
+      setCallStatus("Failed to connect. Network firewall is blocking WebRTC.");
+      setTimeout(() => setCallStatus(""), 5000);
+    });
+
+    // Step 2: Connection bypasses firewall and opens!
     dataConn.on("open", () => {
+      setCallStatus("Connected! Ringing friend's device...");
       dataConn.send({ type: "CALL_REQUEST", callerId: peerId });
 
       dataConn.on("data", (data) => {
         if (data.type === "CALL_ACCEPTED") {
-          setCallStatus("Accepted! Connecting...");
+          setCallStatus("Accepted! Connecting video...");
           
           const call = peerInstance.current.call(friendIdClean, localStream);
           call.on("stream", (userVideoStream) => setRemoteStream(userVideoStream));
