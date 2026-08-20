@@ -1,0 +1,303 @@
+:root {
+    --bg-inner: #f4f5f7;
+    --dark-card: #1c1c1c;
+    --blog-card: #e5e6e8;
+    --purple-card: #a875ff;
+    --green-card: #9bfa1c;
+    --text-main: #111111;
+    --text-light: #ffffff;
+    --font-family: 'Inter', sans-serif;
+}
+
+.landing-body {
+    font-family: var(--font-family);
+    background-color: var(--bg-inner);
+    min-height: 100vh;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Fullscreen Container */
+.landing-container {
+    width: 100%;
+    min-height: 100vh;
+    padding: 2rem 3rem;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Navigation */
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding: 10px 0;
+}
+
+.nav-left {
+    display: flex;
+    align-items: center;
+    gap: 2.5rem;
+}
+
+.logo {
+    width: 40px;
+    height: 40px;
+    border: 4px solid var(--text-main);
+    border-radius: 50%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo::after {
+    content: '';
+    width: 12px;
+    height: 12px;
+    background-color: var(--text-main);
+    border-radius: 50%;
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.nav-links a {
+    text-decoration: none;
+    color: var(--text-main);
+    font-weight: 500;
+    font-size: 0.95rem;
+    transition: opacity 0.2s;
+}
+
+.nav-links a:hover {
+    opacity: 0.6;
+}
+
+.nav-right {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn {
+    padding: 0.6rem 1.2rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: transform 0.2s, background 0.2s;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+}
+
+.btn-login {
+    background: transparent;
+    color: var(--text-main);
+}
+
+.btn-signup {
+    background: var(--text-main);
+    color: var(--text-light);
+}
+
+/* Bento Grid Layout */
+.bento-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    flex-grow: 1;
+    min-height: 600px;
+}
+
+.bento-card {
+    border-radius: 28px;
+    padding: 2.5rem;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.small-text {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1.5rem;
+    opacity: 0.8;
+}
+
+.bento-card h2 {
+    font-size: 2.2rem;
+    font-weight: 600;
+    line-height: 1.1;
+    z-index: 2;
+}
+
+/* Dark Card (Main Feature) */
+.dark-card {
+    background-color: var(--dark-card);
+    color: var(--text-light);
+    justify-content: space-between;
+}
+
+.dark-card h1 {
+    font-size: 4rem;
+    font-weight: 600;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+    max-width: 90%;
+}
+
+.action-area {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    z-index: 2;
+    margin-top: auto;
+}
+
+.btn-join {
+    background: var(--text-light);
+    color: var(--text-main);
+    padding: 0.8rem 1.5rem;
+    border-radius: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-join svg {
+    width: 16px;
+    height: 16px;
+}
+
+.explore-text {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    cursor: pointer;
+}
+
+.dark-card-graphics {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 350px;
+    height: 350px;
+}
+
+/* Right Column Grid */
+.right-column {
+    display: grid;
+    grid-template-rows: 1.2fr 1fr;
+    gap: 1.5rem;
+}
+
+/* Blog Card */
+.blog-card {
+    background-color: var(--blog-card);
+    color: var(--text-main);
+    justify-content: space-between;
+}
+
+.blog-card h2 {
+    margin-top: auto;
+    font-size: 2.5rem;
+}
+
+/* Abstract CSS Planets */
+.planet-large {
+    position: absolute;
+    bottom: -20%;
+    right: -5%;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #888, #111);
+    z-index: 1;
+}
+
+.planet-small {
+    position: absolute;
+    top: 20%;
+    right: 30%;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #666, #000);
+    z-index: 1;
+}
+
+/* Bottom Row */
+.bottom-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+}
+
+.info-card h2 {
+    margin-top: auto;
+}
+
+.purple-card {
+    background-color: var(--purple-card);
+    color: var(--text-light);
+}
+
+.green-card {
+    background-color: var(--green-card);
+    color: var(--text-main);
+}
+
+/* Icons */
+.icon-top-right {
+    position: absolute;
+    top: 2.5rem;
+    right: 2.5rem;
+    width: 24px;
+    height: 24px;
+    z-index: 2;
+}
+
+/* Responsive Design */
+@media (max-width: 968px) {
+    .landing-container {
+        padding: 1.5rem;
+    }
+    .bento-grid {
+        grid-template-columns: 1fr;
+    }
+    .dark-card {
+        min-height: 400px;
+    }
+    .dark-card h1 {
+        font-size: 3rem;
+    }
+    .right-column {
+        grid-template-rows: auto auto;
+    }
+    .blog-card {
+        min-height: 300px;
+    }
+    .bottom-row {
+        grid-template-columns: 1fr;
+    }
+    .info-card {
+        min-height: 200px;
+    }
+    .nav-left {
+        gap: 1rem;
+    }
+    .nav-links {
+        display: none;
+    }
+}

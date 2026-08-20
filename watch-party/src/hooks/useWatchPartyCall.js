@@ -34,14 +34,9 @@ export default function useWatchPartyCall({
     user1MediaRef.current = user1Media;
   }, [user1Media]);
 
-  // Retrieve existing Peer ID from session or generate a new 6-char ID
-  const getOrCreatePeerId = () => {
-    let savedId = sessionStorage.getItem("watchparty_peer_id");
-    if (!savedId) {
-      savedId = Math.random().toString(36).substring(2, 8).toUpperCase();
-      sessionStorage.setItem("watchparty_peer_id", savedId);
-    }
-    return savedId;
+  // Generate a fresh 6-char ID every time the page loads
+  const generatePeerId = () => {
+    return Math.random().toString(36).substring(2, 8).toUpperCase();
   };
 
   const broadcastMediaState = (mediaState) => {
@@ -84,9 +79,11 @@ export default function useWatchPartyCall({
 
         const res = await fetch("https://watch-party-74e5.onrender.com/api/turn-credentials");
         const turnData = await res.json();
-        const persistentId = getOrCreatePeerId();
 
-        peer = new Peer(persistentId, {
+        // Use the new fresh ID generator to prevent the refresh deadlock!
+        const freshId = generatePeerId();
+
+        peer = new Peer(freshId, {
           host: "watch-party-74e5.onrender.com",
           port: 443,
           path: "/myapp",
@@ -101,31 +98,6 @@ export default function useWatchPartyCall({
         peer.on("open", (id) => {
           if (!isMounted) return;
           setPeerId(id);
-
-          // Check if user was in a call prior to refreshing
-          const wasConnected = sessionStorage.getItem("watchparty_is_connected") === "true";
-          const savedFriend = sessionStorage.getItem("watchparty_connected_friend");
-          const savedRoom = sessionStorage.getItem("watchparty_active_room");
-
-          if (wasConnected && savedFriend) {
-            setActiveRoomId(savedRoom || id);
-            setIsConnected(true);
-            setCallStatus("Reconnecting to room...");
-
-            // Send silent reconnect handshake
-            const dataConn = peer.connect(savedFriend);
-            dataConnRef.current = dataConn;
-
-            dataConn.on("open", () => {
-              dataConn.send({ type: "CALL_RECONNECT", callerId: id });
-              setCallStatus("Connected!");
-              setTimeout(() => setCallStatus(""), 3000);
-            });
-
-            dataConn.on("data", (data) => {
-              handleIncomingData(data, dataConn, myStream);
-            });
-          }
         });
 
         // Listen for incoming Data Connections
@@ -135,23 +107,6 @@ export default function useWatchPartyCall({
           conn.on("data", (data) => {
             if (data.type === "CALL_REQUEST") {
               setIncomingCall({ callerId: data.callerId, conn });
-            } else if (data.type === "CALL_RECONNECT") {
-              // Auto-accept silently on refresh
-              setIsConnected(true);
-              const room = sessionStorage.getItem("watchparty_active_room") || persistentId;
-              setActiveRoomId(room);
-              sessionStorage.setItem("watchparty_is_connected", "true");
-              sessionStorage.setItem("watchparty_connected_friend", data.callerId);
-              sessionStorage.setItem("watchparty_active_room", room);
-
-              conn.send({ type: "CALL_ACCEPTED" });
-              conn.send({ type: "MEDIA_STATE", ...user1MediaRef.current });
-
-              const call = peer.call(data.callerId, myStream);
-              currentCallRef.current = call;
-              call.on("stream", (userVideoStream) => {
-                if (isMounted) setRemoteStream(userVideoStream);
-              });
             } else {
               handleIncomingData(data, conn, myStream);
             }
@@ -184,18 +139,6 @@ export default function useWatchPartyCall({
     const handleIncomingData = (data, conn, stream) => {
       if (data.type === "MEDIA_STATE") {
         setUser2Media({ mic: data.mic, cam: data.cam });
-      } else if (data.type === "CALL_ACCEPTED") {
-        setIsConnected(true);
-        setCallStatus("Connected!");
-        const savedFriend = sessionStorage.getItem("watchparty_connected_friend");
-        if (savedFriend && peerInstance.current && stream) {
-          const call = peerInstance.current.call(savedFriend, stream);
-          currentCallRef.current = call;
-          call.on("stream", (userVideoStream) => {
-            if (isMounted) setRemoteStream(userVideoStream);
-          });
-        }
-        setTimeout(() => setCallStatus(""), 3000);
       } else if (data.type === "CALL_REJECTED") {
         leaveCall();
         setCallStatus("Call was rejected.");
@@ -209,9 +152,6 @@ export default function useWatchPartyCall({
         setFriendId("");
         setUser2Media({ mic: true, cam: true });
         setCallStatus("Friend left the call.");
-        sessionStorage.removeItem("watchparty_connected_friend");
-        sessionStorage.removeItem("watchparty_active_room");
-        sessionStorage.removeItem("watchparty_is_connected");
         setTimeout(() => setCallStatus(""), 4000);
       } else {
         onReceiveData(data);
@@ -338,10 +278,6 @@ export default function useWatchPartyCall({
           setActiveRoomId(friendIdClean);
           setCallStatus("Connected!");
 
-          sessionStorage.setItem("watchparty_is_connected", "true");
-          sessionStorage.setItem("watchparty_connected_friend", friendIdClean);
-          sessionStorage.setItem("watchparty_active_room", friendIdClean);
-
           const call = peerInstance.current.call(friendIdClean, localStream);
           currentCallRef.current = call;
           call.on("stream", (userVideoStream) => setRemoteStream(userVideoStream));
@@ -370,10 +306,6 @@ export default function useWatchPartyCall({
       dataConnRef.current = incomingCall.conn;
       setIsConnected(true);
       setActiveRoomId(peerId);
-
-      sessionStorage.setItem("watchparty_is_connected", "true");
-      sessionStorage.setItem("watchparty_connected_friend", incomingCall.callerId);
-      sessionStorage.setItem("watchparty_active_room", peerId);
 
       incomingCall.conn.send({ type: "CALL_ACCEPTED" });
       incomingCall.conn.send({ type: "MEDIA_STATE", ...user1MediaRef.current });
@@ -420,10 +352,6 @@ export default function useWatchPartyCall({
     setFriendId("");
     setUser2Media({ mic: true, cam: true });
     setCallStatus("You left the call.");
-
-    sessionStorage.removeItem("watchparty_connected_friend");
-    sessionStorage.removeItem("watchparty_active_room");
-    sessionStorage.removeItem("watchparty_is_connected");
 
     setTimeout(() => setCallStatus(""), 3000);
   };
