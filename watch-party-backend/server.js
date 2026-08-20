@@ -91,6 +91,37 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
+// --- JWT AUTHENTICATION MIDDLEWARE ---
+const authenticateToken = (req, res, next) => {
+  // The token comes in the header as "Bearer <token>"
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  // Use your secret key to verify if the token is authentic
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+    // If valid, attach the user data to the request and move on
+    req.user = user;
+    next();
+  });
+};
+
+// --- VERIFY SESSION ROUTE ---
+app.get('/api/verify', authenticateToken, (req, res) => {
+  // If the authenticateToken middleware passes, this code runs.
+  // We send back a 200 OK status and the user's details.
+  res.status(200).json({ 
+    valid: true, 
+    user: req.user 
+  });
+});
+
 // 3. Login User Route
 app.post('/api/login', async (req, res) => {
     try {
