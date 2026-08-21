@@ -16,6 +16,7 @@
     "react-dom": "^19.2.8",
     "react-draggable": "^4.7.1",
     "react-player": "^3.4.0",
+    "react-router-dom": "^7.18.2",
     "react-youtube": "^10.1.0"
   },
   "devDependencies": {

@@ -1,7 +1,8 @@
 import React from 'react';
 import './LandingPage.css';
 
-export default function LandingPage({ onJoinParty, onLoginClick }) {
+// Change your component definition to look like this:
+export default function LandingPage({ onLoginClick, onSignupClick }) {
     return (
         <div className="landing-body">
             <div className="landing-container">
@@ -18,7 +19,7 @@ export default function LandingPage({ onJoinParty, onLoginClick }) {
                     </div>
                     <div className="nav-right">
                         <button className="btn btn-login" onClick={onLoginClick}>LOG IN</button>
-                        <button className="btn btn-signup">SIGN UP</button>
+                        <button className="btn btn-signup" onClick={onSignupClick}>SIGN UP</button>
                     </div>
                 </nav>
 
@@ -37,7 +38,7 @@ export default function LandingPage({ onJoinParty, onLoginClick }) {
                         <div className="dark-card-graphics"></div>
 
                         <div className="action-area">
-                            <button className="btn btn-join" onClick={onJoinParty}>
+                            <button className="btn btn-join">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                     <circle cx="9" cy="21" r="1" />
                                     <circle cx="20" cy="21" r="1" />
