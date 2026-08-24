@@ -1,6 +1,6 @@
 # 🎬 WatchParty
 
-WatchParty is a real-time synchronized video streaming and screen-sharing web application featuring peer-to-peer (WebRTC) audio/video calling. It allows users to watch YouTube videos in perfect synchronization or share their desktop screen while interacting via live, draggable webcam feeds.
+WatchParty is a real-time synchronized video streaming, local video playback, and screen-sharing web application featuring peer-to-peer (WebRTC) audio/video calling. It allows users to watch YouTube videos or their own local video files in perfect synchronization, or share their desktop screen while interacting via live, draggable webcam feeds.
 
 ---
 
@@ -9,11 +9,17 @@ WatchParty is a real-time synchronized video streaming and screen-sharing web ap
 - **📺 Synchronized YouTube Playback (`/room`)**:
   - Watch YouTube videos together in real time.
   - Play, pause, seek, and URL changes automatically synchronize between connected peers over WebRTC data channels.
-  - Fullscreen mode with draggable camera feeds.
+  - Fullscreen mode with floating, draggable camera feeds.
+
+- **📁 Synchronized Local Video Playback (`/local-sync`)**:
+  - Watch local video files (MP4, MKV, WebM, etc.) from your device synchronously with friends without uploading files to any external server.
+  - Precise Play, Pause, and Seek synchronization with responsive custom media controls.
+  - Safe mobile autoplay handling with deferred-play resolution (`pendingPlayTimeRef`) and feedback loop protection (`isRemoteActionRef`).
+  - Real-time peer file status indicators (`Friend loaded: filename`).
 
 - **🖥️ Real-Time Screen Sharing (`/screen-share`)**:
   - Low-latency screen and window sharing using the browser's `getDisplayMedia` API.
-  - Stream shared display content alongside video calling tiles.
+  - Stream shared display content alongside live video calling tiles.
 
 - **📞 WebRTC Audio & Video Calling**:
   - Direct peer-to-peer (P2P) communication powered by PeerJS.
@@ -41,7 +47,9 @@ graph TD
 - **Framework**: React 19 + Vite
 - **Styling**: Tailwind CSS + Custom CSS (Glassmorphism & animations)
 - **WebRTC & Streaming**: `peerjs`
-- **Video Player**: `react-youtube` (YouTube IFrame Player API wrapper)
+- **Video Players**:
+  - `react-youtube`: Embedded YouTube player with programmatic playback control
+  - Native HTML5 `<video>`: Custom synced controller for local media files
 - **UI Components & Icons**: `react-draggable`, `lucide-react`, `react-router-dom`
 
 ### Backend (`watch-party-backend`)
@@ -62,12 +70,14 @@ watchParty/
 │   │   ├── hooks/
 │   │   │   ├── useWatchPartyCall.js  # WebRTC peer connections, mic/cam, calling lifecycle
 │   │   │   ├── useWatchPartyVideo.js # YouTube video play/pause/seek synchronization
+│   │   │   ├── useLocalVideoParty.js # Local video playback & playback sync controller
 │   │   │   └── useScreenShareCall.js # Screen capture & peer stream management
 │   │   ├── App.jsx                   # Application routing & JWT session verification
-│   │   ├── LandingPage.jsx           # Landing / Hero page
+│   │   ├── LandingPage.jsx           # Landing / Bento Hero page (YouTube, Local Sync, Screen Share)
 │   │   ├── LoginPage.jsx             # User login form
 │   │   ├── SignupPage.jsx            # User registration form
 │   │   ├── WatchPartyRoomRefactored.jsx # YouTube synchronized room UI
+│   │   ├── LocalVideoPartyRoom.jsx   # Local video sync room UI with custom scrub controls
 │   │   ├── ScreenShareRoom.jsx       # Screen sharing room UI
 │   │   ├── index.css                 # Core CSS design tokens & layout
 │   │   └── main.jsx                  # React entry point
@@ -87,11 +97,14 @@ watchParty/
 ## 🔄 How Video Synchronization Works
 
 1. **Room Pairing**: Users share a 6-character room ID to establish a WebRTC Peer-to-Peer Data Channel and Media Stream.
-2. **URL Loading**: When User A loads a YouTube link, an event `{ type: "LOAD_VIDEO", videoId }` is broadcast over the data channel to User B.
-3. **Play / Pause / Seek Sync**:
-   - When User A interacts with the player, `handlePlay` or `handlePause` captures the current video timestamp.
-   - A message `{ type: "PLAY", time }` or `{ type: "PAUSE", time }` is sent to User B.
-   - User B's player seeks to `time` and reflects the action while an `isRemoteActionRef` flag temporarily prevents infinite broadcast loops.
+2. **YouTube Video Sync**:
+   - When User A loads a YouTube link, `{ type: "LOAD_VIDEO", videoId }` is broadcast to User B.
+   - Play/pause/seek triggers send `{ type: "PLAY", time }` or `{ type: "PAUSE", time }`.
+3. **Local Video Sync**:
+   - Both users choose their local file on their respective machines.
+   - When a user loads a file, `{ type: "FILE_LOADED", fileName }` is sent to notify the peer.
+   - On Play/Pause/Seek, commands are transmitted over the WebRTC data channel.
+   - Guard refs (`isRemoteActionRef`) prevent circular command loops, and deferred playback (`pendingPlayTimeRef`) handles mobile autoplay restrictions gracefully.
 4. **Media State Broadcast**: When a user mutes their mic or toggles their camera, `{ type: "MEDIA_STATE", mic, cam }` is transmitted so the peer's UI updates dynamically.
 
 ---

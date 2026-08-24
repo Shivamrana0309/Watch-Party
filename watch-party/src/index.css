@@ -605,3 +605,8 @@
 .leave-btn:active {
   transform: scale(0.95);
 }
+
+/* Completely hide the native video fullscreen button */
+video::-webkit-media-controls-fullscreen-button {
+  display: none !important;
+}
