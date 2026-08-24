@@ -84,24 +84,93 @@ export default function ScreenShareRoom() {
 
   return (
     <div className="watch-party-room">
-      <div className="connection-row">
-        <div className="room-id-panel">
-          <span className="room-id-label">{isConnected ? "Active Room ID:" : "Your Room ID:"}</span>
+      <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
+        
+        {/* Left: Buttons & Action */}
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button className="btn btn-join" onClick={() => window.location.href='/party'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              JOIN A PARTY
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/local-sync'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              SYNC LOCAL VIDEO
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/screen-share'} style={{ 
+              backgroundColor: '#2563eb', 
+              color: '#fff', 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #2563eb',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              SHARE SCREEN
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', margin: 0, height: '52px', alignItems: 'center' }}>
+            <button className="btn btn-join" onClick={toggleScreenShare} style={{ 
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", 
+              fontSize: '0.85rem', padding: '0.65rem 1.25rem', margin: 0, height: '100%',
+              backgroundColor: isSharingScreen ? '#2563eb' : '#eff6ff',
+              color: isSharingScreen ? '#fff' : '#000',
+              border: isSharingScreen ? '1px solid #2563eb' : '1px solid #dbeafe',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              {isSharingScreen ? <MonitorOff size={16} /> : <MonitorUp size={16} />}
+              {isSharingScreen ? 'STOP PRESENTING' : 'START PRESENTING'}
+            </button>
+          </div>
+        </div>
+
+        {/* Middle: Room ID */}
+        <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
+          <span className="room-id-label" style={{ whiteSpace: 'nowrap' }}>
+            {isConnected ? "Active Room ID:" : "Your Room ID:"}
+          </span>
           <code className="room-id-code">{displayedRoomId || "Generating..."}</code>
-          <button onClick={() => navigator.clipboard.writeText(displayedRoomId)} className="copy-id-btn" title="Copy Room ID">
+          <button
+            onClick={() => navigator.clipboard.writeText(displayedRoomId)}
+            className="copy-id-btn"
+            title="Copy Room ID"
+          >
             <Copy size={16} />
           </button>
         </div>
 
-        <div className="friend-connect-panel">
+        {/* Right: Friend Connect */}
+        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
           {isConnected ? (
             <div className="connected-panel-wrap">
-              <div className="connected-badge">
+              <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
                 <CheckCircle2 size={18} className="text-green-600" />
                 <span>Connected in Room <strong>{activeRoomId}</strong></span>
               </div>
               <button onClick={leaveCall} className="leave-btn" title="Leave Call">
-                <PhoneOff size={16} /> Leave Call
+                <PhoneOff size={16} />
+                Leave Call
               </button>
             </div>
           ) : (
@@ -112,10 +181,11 @@ export default function ScreenShareRoom() {
                 value={friendId}
                 onChange={(e) => setFriendId(e.target.value)}
                 className="friend-id-input"
-                style={{ textTransform: "uppercase" }}
+                style={{ textTransform: "uppercase", height: '36px' }}
               />
-              <button onClick={callFriend} className="connect-btn">
-                <PhoneCall size={16} /> Connect
+              <button onClick={callFriend} className="connect-btn" style={{ whiteSpace: 'nowrap', height: '36px' }}>
+                <PhoneCall size={16} />
+                Connect
               </button>
             </>
           )}
@@ -190,9 +260,6 @@ export default function ScreenShareRoom() {
                 </button>
                 <button onClick={toggleLocalCam} onMouseDown={(e) => e.stopPropagation()} className={`media-toggle-btn ${user1Media.cam ? "is-on" : "is-off"}`}>
                   {user1Media.cam ? <VideoIcon size={18} /> : <VideoOff size={18} />}
-                </button>
-                <button onClick={toggleScreenShare} onMouseDown={(e) => e.stopPropagation()} className={`media-toggle-btn ${isSharingScreen ? "is-on" : "is-off"}`}>
-                  {isSharingScreen ? <MonitorOff size={18} /> : <MonitorUp size={18} />}
                 </button>
               </div>
             </div>

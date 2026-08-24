@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import Draggable from "react-draggable";
 import YouTube from "react-youtube";
 import {
@@ -13,6 +13,7 @@ import {
   PhoneCall,
   PhoneOff,
   CheckCircle2,
+  User,
 } from "lucide-react";
 
 import "./LandingPage.css"; // Ensure btn styles are available
@@ -22,7 +23,44 @@ export default function WatchPartyRoomOffline() {
   const containerRef = useRef(null);
   const user1Ref = useRef(null);
   const user2Ref = useRef(null);
+  const profileDropdownRef = useRef(null);
   
+  const [showProfile, setShowProfile] = useState(false);
+  const [userInfo, setUserInfo] = useState({ name: 'Guest User', username: '@guest' });
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      try {
+        const res = await fetch('https://watch-party-74e5.onrender.com/api/verify', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.valid && data.user) {
+            setUserInfo({ 
+              name: data.user.name || 'Guest User', 
+              username: `@${data.user.username}` 
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch user:", e);
+      }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setShowProfile(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
   const [inputUrl, setInputUrl] = useState("");
   const [videoId, setVideoId] = useState("dQw4w9WgXcQ");
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -153,8 +191,50 @@ export default function WatchPartyRoomOffline() {
           </button>
         </div>
 
-        {/* Right: Friend Connect */}
-        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
+        {/* Right: Friend Connect (with absolute positioned Profile above) */}
+        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative' }}>
+          
+          <div ref={profileDropdownRef} style={{ position: 'absolute', top: '-60px', right: '0' }}>
+            <button 
+              onClick={() => setShowProfile(!showProfile)}
+              style={{
+                width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e2e8f0',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }}
+            >
+              <User size={18} color="#475569" />
+            </button>
+            
+            {showProfile && (
+              <div style={{
+                position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem',
+                backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem',
+                boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                width: '180px', padding: '1rem', zIndex: 50,
+                display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left'
+              }}>
+                <div style={{ display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{userInfo.name}</span>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{userInfo.username}</span>
+                </div>
+                <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: 0 }} />
+                <button 
+                  onClick={() => {
+                    localStorage.removeItem('token');
+                    window.location.href='/';
+                  }} 
+                  style={{
+                    backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '0.25rem',
+                    padding: '0.4rem', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500, width: '100%'
+                  }}
+                >
+                  Log out
+                </button>
+              </div>
+            )}
+          </div>
+
           {isConnected ? (
             <div className="connected-panel-wrap">
               <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>

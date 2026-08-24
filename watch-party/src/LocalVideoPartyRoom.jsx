@@ -90,42 +90,78 @@ export default function LocalVideoPartyRoom() {
 
   return (
     <div className="watch-party-room">
-      {/* File Selection Header */}
-      <div className="watch-party-form" style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-        <label
-          className="load-video-btn"
-          style={{
-            cursor: "pointer",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "0.5rem",
-            padding: "0.6rem 1.2rem",
-          }}
-        >
-          <FolderOpen size={18} />
-          Choose Video File
-          <input
-            type="file"
-            accept="video/*"
-            onChange={handleFileSelect}
-            style={{ display: "none" }}
-          />
-        </label>
+      <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
         
-        <div style={{ display: "flex", flexDirection: "column", fontSize: "0.85rem", color: "#666" }}>
-          <span><strong>Your File:</strong> {fileName || "None selected"}</span>
-          {peerFileName && (
-            <span style={{ color: "#16a34a", display: "inline-flex", alignItems: "center", gap: "4px" }}>
-              <FileCheck size={14} /> Friend loaded: {peerFileName}
-            </span>
-          )}
-        </div>
-      </div>
+        {/* Left: Buttons, Upload & File Names */}
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <button className="btn btn-join" onClick={() => window.location.href='/party'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              JOIN A PARTY
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/local-sync'} style={{ 
+              backgroundColor: '#2563eb', 
+              color: '#fff', 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #2563eb',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              SYNC LOCAL VIDEO
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/screen-share'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              SHARE SCREEN
+            </button>
+          </div>
 
-      {/* Connection Panel */}
-      <div className="connection-row">
-        <div className="room-id-panel">
-          <span className="room-id-label">{isConnected ? "Active Room ID:" : "Your Room ID:"}</span>
+          <div style={{ display: 'flex', gap: '1rem', margin: 0, height: '52px', alignItems: 'center' }}>
+            <label className="btn btn-join" style={{ 
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", 
+              fontSize: '0.85rem', padding: '0.65rem 1.25rem', border: '1px solid #dbeafe', backgroundColor: '#eff6ff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', margin: 0, height: '100%'
+            }}>
+              <FolderOpen size={16} />
+              UPLOAD VIDEO
+              <input type="file" accept="video/*" onChange={handleFileSelect} style={{ display: "none" }} />
+            </label>
+
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '100%', marginLeft: '0.5rem' }}>
+              <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "#475569", whiteSpace: "nowrap", flex: 1 }}>
+                <strong>Your File:</strong> &nbsp;{fileName || "None"}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "#16a34a", whiteSpace: "nowrap", flex: 1 }}>
+                <strong>Friend's File:</strong> &nbsp;{peerFileName || "None"}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle: Room ID */}
+        <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
+          <span className="room-id-label" style={{ whiteSpace: 'nowrap' }}>
+            {isConnected ? "Active Room ID:" : "Your Room ID:"}
+          </span>
           <code className="room-id-code">{displayedRoomId || "Generating..."}</code>
           <button
             onClick={() => navigator.clipboard.writeText(displayedRoomId)}
@@ -136,15 +172,17 @@ export default function LocalVideoPartyRoom() {
           </button>
         </div>
 
-        <div className="friend-connect-panel">
+        {/* Right: Friend Connect */}
+        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
           {isConnected ? (
             <div className="connected-panel-wrap">
-              <div className="connected-badge">
+              <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
                 <CheckCircle2 size={18} className="text-green-600" />
                 <span>Connected in Room <strong>{activeRoomId}</strong></span>
               </div>
               <button onClick={leaveCall} className="leave-btn" title="Leave Call">
-                <PhoneOff size={16} /> Leave Call
+                <PhoneOff size={16} />
+                Leave Call
               </button>
             </div>
           ) : (
@@ -155,10 +193,11 @@ export default function LocalVideoPartyRoom() {
                 value={friendId}
                 onChange={(e) => setFriendId(e.target.value)}
                 className="friend-id-input"
-                style={{ textTransform: "uppercase" }}
+                style={{ textTransform: "uppercase", height: '36px' }}
               />
-              <button onClick={callFriend} className="connect-btn">
-                <PhoneCall size={16} /> Connect
+              <button onClick={callFriend} className="connect-btn" style={{ whiteSpace: 'nowrap', height: '36px' }}>
+                <PhoneCall size={16} />
+                Connect
               </button>
             </>
           )}

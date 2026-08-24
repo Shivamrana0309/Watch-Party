@@ -113,13 +113,20 @@ const authenticateToken = (req, res, next) => {
 };
 
 // --- VERIFY SESSION ROUTE ---
-app.get('/api/verify', authenticateToken, (req, res) => {
-  // If the authenticateToken middleware passes, this code runs.
-  // We send back a 200 OK status and the user's details.
-  res.status(200).json({ 
-    valid: true, 
-    user: req.user 
-  });
+app.get('/api/verify', authenticateToken, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select('-password');
+    if (!user) {
+        return res.status(404).json({ valid: false, message: "User not found" });
+    }
+    res.status(200).json({ 
+      valid: true, 
+      user 
+    });
+  } catch (error) {
+    console.error("Verification error:", error);
+    res.status(500).json({ valid: false, message: "Server error" });
+  }
 });
 
 // 3. Login User Route
