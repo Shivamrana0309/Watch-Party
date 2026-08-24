@@ -1,1 +1,1 @@
-export { default } from "./WatchPartyRoomRefactored";
+export { default } from "./WatchPartyRoomOffline";
