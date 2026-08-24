@@ -5,19 +5,14 @@ export default function useLocalVideoParty({ videoRef, dataConnRef, containerRef
   const [fileName, setFileName] = useState("");
   const [peerFileName, setPeerFileName] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
+
   // Shared State for Custom Controls
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  // Deferred play: when remote play() is blocked by autoplay policy,
-  // we store the timestamp so the next user tap resumes from the right spot
-  const pendingPlayTimeRef = useRef(null);
-
-  // Guard flag to prevent remote actions from re-broadcasting back
-  const isRemoteActionRef = useRef(false);
-  const guardTimerRef = useRef(null);
+  // Tracks our drag debouncer for smooth seeking
+  const seekTimeoutRef = useRef(null);
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
@@ -35,99 +30,108 @@ export default function useLocalVideoParty({ videoRef, dataConnRef, containerRef
     }
   };
 
-  // Receive Commands from Peer
+  // Receive Commands from Peer (No more brittle lock ref!)
   const handleReceiveData = useCallback((data) => {
     if (!videoRef.current) return;
     const player = videoRef.current;
 
     if (data.type === "FILE_LOADED") {
-      // File notifications don't need the guard — no playback side-effects
       setPeerFileName(data.fileName);
       return;
     }
 
     if (data.type === "PLAY") {
-      // Set guard ONLY for playback commands to block re-broadcasts
-      isRemoteActionRef.current = true;
-      player.currentTime = data.time;
-      player.play().catch(() => {
-        // Autoplay blocked on mobile — store the time so next user tap picks it up
-        console.warn("Remote play blocked by autoplay policy — waiting for user tap");
-        pendingPlayTimeRef.current = data.time;
-      });
-    } else if (data.type === "PAUSE") {
-      isRemoteActionRef.current = true;
-      player.currentTime = data.time;
-      if (!player.paused) {
-        player.pause();
-      }
-      pendingPlayTimeRef.current = null; // Clear any pending play
-    } else if (data.type === "SEEK") {
-      isRemoteActionRef.current = true;
-      player.currentTime = data.time;
-    } else {
-      // Unknown message type — don't set guard, nothing to do
-      return;
-    }
+      const needsSeek = Math.abs(player.currentTime - data.time) > 0.5;
 
-    // Clear any previous guard timer so rapid commands don't release early
-    if (guardTimerRef.current) clearTimeout(guardTimerRef.current);
-    guardTimerRef.current = setTimeout(() => {
-      isRemoteActionRef.current = false;
-      guardTimerRef.current = null;
-    }, 500);
+      const attemptPlay = () => {
+        player.play().catch((err) => {
+          console.warn("Autoplay blocked on peer.", err);
+        });
+      };
+
+      if (needsSeek) {
+        // Safety Fallback: If the browser fails to seek, we force it to play anyway 
+        // after 1 second so the video doesn't freeze permanently.
+        let fallbackTimer;
+        const onSeeked = () => {
+          clearTimeout(fallbackTimer);
+          attemptPlay();
+          player.removeEventListener("seeked", onSeeked);
+        };
+
+        player.addEventListener("seeked", onSeeked, { once: true });
+        fallbackTimer = setTimeout(() => {
+          player.removeEventListener("seeked", onSeeked);
+          attemptPlay();
+        }, 1000);
+
+        try {
+          player.currentTime = data.time;
+        } catch (e) {
+          console.warn("Browser rejected remote seek", e);
+          attemptPlay();
+        }
+      } else {
+        attemptPlay();
+      }
+
+    } else if (data.type === "PAUSE") {
+      try {
+        if (Math.abs(player.currentTime - data.time) > 0.5) player.currentTime = data.time;
+      } catch (e) { }
+      if (!player.paused) player.pause();
+
+    } else if (data.type === "SEEK") {
+      try {
+        player.currentTime = data.time;
+      } catch (e) { }
+    }
   }, [videoRef]);
 
   // Master Shared Controls
   const togglePlayPause = () => {
     if (!videoRef.current || !videoSrc) return;
-    if (isRemoteActionRef.current) return; // Don't re-broadcast remote actions
-    const player = videoRef.current;
 
+    // A physical user click ALWAYS overrides the system. No lock checks here!
+    const player = videoRef.current;
     const willPlay = player.paused;
 
     if (willPlay) {
-      // If there's a pending remote play, use that timestamp
-      if (pendingPlayTimeRef.current !== null) {
-        player.currentTime = pendingPlayTimeRef.current;
-        pendingPlayTimeRef.current = null;
-      }
-
       player.play()
         .then(() => {
-          // Only broadcast AFTER play actually succeeds
           if (dataConnRef.current && dataConnRef.current.open) {
-            dataConnRef.current.send({
-              type: "PLAY",
-              time: player.currentTime,
-            });
+            dataConnRef.current.send({ type: "PLAY", time: player.currentTime });
           }
         })
         .catch(() => {
-          console.warn("Play failed — user gesture may be required");
+          alert("Please click anywhere on the page once to unlock the video player.");
         });
     } else {
       player.pause();
-      pendingPlayTimeRef.current = null;
-      // Pause is synchronous — safe to broadcast immediately
       if (dataConnRef.current && dataConnRef.current.open) {
-        dataConnRef.current.send({
-          type: "PAUSE",
-          time: player.currentTime,
-        });
+        dataConnRef.current.send({ type: "PAUSE", time: player.currentTime });
       }
     }
   };
 
+  // The Debounced Seek Handler
   const handleSeek = (time) => {
     if (!videoRef.current) return;
-    if (isRemoteActionRef.current) return; // Don't re-broadcast remote actions
-    videoRef.current.currentTime = time;
-    
-    // Broadcast to peer
-    if (dataConnRef.current && dataConnRef.current.open) {
-      dataConnRef.current.send({ type: "SEEK", time });
+
+    try {
+      videoRef.current.currentTime = time;
+      setCurrentTime(time);
+    } catch (e) {
+      console.warn("Local seek rejected", e);
     }
+
+    if (seekTimeoutRef.current) clearTimeout(seekTimeoutRef.current);
+
+    seekTimeoutRef.current = setTimeout(() => {
+      if (dataConnRef.current && dataConnRef.current.open) {
+        dataConnRef.current.send({ type: "SEEK", time });
+      }
+    }, 150);
   };
 
   // STRICT UI SYNC: Listen to the native DOM events to update our React icons
@@ -137,8 +141,6 @@ export default function useLocalVideoParty({ videoRef, dataConnRef, containerRef
 
     const updateTime = () => setCurrentTime(player.currentTime);
     const updateDuration = () => setDuration(player.duration);
-    
-    // These ensure the UI always matches the exact state of the video file
     const syncPlayState = () => setIsPlaying(true);
     const syncPauseState = () => setIsPlaying(false);
 
@@ -158,7 +160,7 @@ export default function useLocalVideoParty({ videoRef, dataConnRef, containerRef
   }, [videoRef, videoSrc]);
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) containerRef.current?.requestFullscreen().catch(() => {});
+    if (!document.fullscreenElement) containerRef.current?.requestFullscreen().catch(() => { });
     else document.exitFullscreen();
   };
 
