@@ -79,7 +79,7 @@ export default function WatchPartyRoomOffline() {
         {/* Left: Buttons + YouTube URL */}
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button className="btn btn-join" onClick={() => window.location.href='/room'} style={{ 
+            <button className="btn btn-join" onClick={() => window.location.href='/party'} style={{ 
               fontSize: '0.85rem', 
               padding: '0.65rem 1.25rem',
               border: '1px solid #dbeafe', 
@@ -92,12 +92,11 @@ export default function WatchPartyRoomOffline() {
               JOIN A PARTY
             </button>
             <button className="btn btn-join" onClick={() => window.location.href='/local-sync'} style={{ 
-              backgroundColor: '#2563eb', 
-              color: '#fff', 
               fontSize: '0.85rem', 
               padding: '0.65rem 1.25rem',
-              border: '1px solid #2563eb',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
             }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
@@ -192,24 +191,14 @@ export default function WatchPartyRoomOffline() {
       >
         <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
           <div className="youtube-host">
-            <YouTube
-              videoId={videoId}
-              ref={playerRef}
-              opts={{
-                width: "100%",
-                height: "100%",
-                playerVars: { autoplay: 0, modestbranding: 1, rel: 0, fs: 0 },
-              }}
-              className="youtube-iframe"
-              iframeClassName="youtube-iframe"
-            />
+            <div style={{ width: '100%', height: '100%', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ color: '#475569', fontSize: '1.25rem', fontWeight: 500 }}>
+                Join a party to start watching
+              </span>
+            </div>
           </div>
           <div className="player-controls-overlay">
-            <div className="controls-click-target">
-              <button onClick={toggleFullscreen} className="fullscreen-toggle">
-                {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
-              </button>
-            </div>
+            {/* Fullscreen button removed from offline room */}
           </div>
         </div>
 
@@ -234,8 +223,19 @@ export default function WatchPartyRoomOffline() {
             >
               <div className="video-surface">
                 {/* Dummy video surface */}
-                <div style={{width: "100%", height: "100%", backgroundColor: "#333", borderRadius: "12px"}} />
-                {!user1Media.cam && <VideoOff className="video-off-icon" />}
+                <div style={{
+                  width: "100%", 
+                  height: "100%", 
+                  backgroundColor: "#333", 
+                  borderRadius: "12px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  textAlign: "center",
+                  padding: "1rem"
+                }}>
+                  <span style={{ color: "#aaa", fontSize: "0.85rem" }}>Waiting for your camera</span>
+                </div>
                 <div className="participant-tag-wrap">
                   <span className="participant-tag">You</span>
                 </div>

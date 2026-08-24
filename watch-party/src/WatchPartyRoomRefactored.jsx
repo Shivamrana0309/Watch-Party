@@ -76,27 +76,74 @@ export default function WatchPartyRoomRefactored() {
 
   return (
     <div className="watch-party-room">
-      <form onSubmit={handleUrlSubmit} className="watch-party-form">
-        <div className="url-input-wrap">
-          <div className="url-input-icon">
-            <Link size={20} className="url-input-icon-svg" />
+      <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
+        
+        {/* Left: Buttons + YouTube URL */}
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <button className="btn btn-join" onClick={() => window.location.href='/party'} style={{ 
+              backgroundColor: '#2563eb', 
+              color: '#fff', 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #2563eb',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+              </svg>
+              JOIN A PARTY
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/local-sync'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              SYNC LOCAL VIDEO
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/screen-share'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              SHARE SCREEN
+            </button>
           </div>
-          <input
-            type="text"
-            placeholder="Paste YouTube URL here..."
-            value={inputUrl}
-            onChange={(e) => setInputUrl(e.target.value)}
-            className="url-input"
-          />
+          <form onSubmit={handleUrlSubmit} className="watch-party-form" style={{ margin: 0, padding: 0 }}>
+            <div className="url-input-wrap">
+              <div className="url-input-icon">
+                <Link size={20} className="url-input-icon-svg" />
+              </div>
+              <input
+                type="text"
+                placeholder="Paste YouTube URL here..."
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                className="url-input"
+                style={{ height: '52px' }}
+              />
+            </div>
+            <button type="submit" className="load-video-btn" style={{ height: '52px' }}>
+              Load Video
+            </button>
+          </form>
         </div>
-        <button type="submit" className="load-video-btn">
-          Load Video
-        </button>
-      </form>
 
-      <div className="connection-row">
-        <div className="room-id-panel">
-          <span className="room-id-label">
+        {/* Middle: Room ID */}
+        <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
+          <span className="room-id-label" style={{ whiteSpace: 'nowrap' }}>
             {isConnected ? "Active Room ID:" : "Your Room ID:"}
           </span>
           <code className="room-id-code">{displayedRoomId || "Generating..."}</code>
@@ -109,10 +156,11 @@ export default function WatchPartyRoomRefactored() {
           </button>
         </div>
 
-        <div className="friend-connect-panel">
+        {/* Right: Friend Connect */}
+        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
           {isConnected ? (
             <div className="connected-panel-wrap">
-              <div className="connected-badge">
+              <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
                 <CheckCircle2 size={18} className="text-green-600" />
                 <span>Connected in Room <strong>{activeRoomId}</strong></span>
               </div>
@@ -129,9 +177,9 @@ export default function WatchPartyRoomRefactored() {
                 value={friendId}
                 onChange={(e) => setFriendId(e.target.value)}
                 className="friend-id-input"
-                style={{ textTransform: "uppercase" }}
+                style={{ textTransform: "uppercase", height: '36px' }}
               />
-              <button onClick={callFriend} className="connect-btn">
+              <button onClick={callFriend} className="connect-btn" style={{ whiteSpace: 'nowrap', height: '36px' }}>
                 <PhoneCall size={16} />
                 Connect
               </button>
