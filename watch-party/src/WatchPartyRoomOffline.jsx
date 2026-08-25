@@ -14,6 +14,8 @@ import {
   PhoneOff,
   CheckCircle2,
   User,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 import "./LandingPage.css"; // Ensure btn styles are available
@@ -27,6 +29,15 @@ export default function WatchPartyRoomOffline() {
   
   const [showProfile, setShowProfile] = useState(false);
   const [userInfo, setUserInfo] = useState({ name: 'Guest User', username: '@guest' });
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add('dark-mode');
+    } else {
+      document.body.classList.remove('dark-mode');
+    }
+  }, [isDarkMode]);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -112,6 +123,45 @@ export default function WatchPartyRoomOffline() {
 
   return (
     <div className="watch-party-room">
+      <style>{`
+        body.dark-mode {
+          background-color: #121212 !important;
+          color: #e5e5e5 !important;
+        }
+        body.dark-mode .watch-party-room {
+          background-color: #121212 !important;
+        }
+        body.dark-mode .btn-join, body.dark-mode .load-video-btn, body.dark-mode .connect-btn {
+          background-color: #1f2937 !important;
+          color: #e5e5e5 !important;
+          border-color: #374151 !important;
+        }
+        body.dark-mode .url-input {
+          background-color: #1f2937 !important;
+          color: #e5e5e5 !important;
+          border-color: #374151 !important;
+        }
+        body.dark-mode .room-id-panel, body.dark-mode .friend-connect-panel, body.dark-mode .connected-panel-wrap {
+          background-color: #1e1e1e !important;
+          border-color: #333 !important;
+          color: #e5e5e5 !important;
+        }
+        body.dark-mode .room-id-label, body.dark-mode .room-id-code, body.dark-mode .friend-id-input {
+          color: #e5e5e5 !important;
+          background-color: transparent !important;
+        }
+        body.dark-mode .friend-id-input {
+          background-color: #1f2937 !important;
+          border-color: #374151 !important;
+        }
+        body.dark-mode .player-panel {
+          background-color: #1a1a1a !important;
+          box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8) !important;
+        }
+        body.dark-mode .video-surface > div {
+          background-color: #1a1a1a !important;
+        }
+      `}</style>
       <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
         
         {/* Left: Buttons + YouTube URL */}
@@ -191,20 +241,43 @@ export default function WatchPartyRoomOffline() {
           </button>
         </div>
 
-        {/* Right: Friend Connect (with absolute positioned Profile above) */}
+        {/* Right: Friend Connect (with absolute positioned Profile & Theme Toggle above) */}
         <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative' }}>
           
-          <div ref={profileDropdownRef} style={{ position: 'absolute', top: '-60px', right: '0' }}>
-            <button 
-              onClick={() => setShowProfile(!showProfile)}
+          <div style={{ position: 'absolute', top: '-60px', right: '0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {/* Theme Toggle Switch */}
+            <div 
+              onClick={() => setIsDarkMode(!isDarkMode)}
               style={{
-                width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e2e8f0',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                width: '64px', height: '38px', borderRadius: '19px', 
+                backgroundColor: isDarkMode ? '#374151' : '#cbd5e1',
+                display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative',
+                transition: 'background-color 0.3s',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
               }}
             >
-              <User size={18} color="#475569" />
-            </button>
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'absolute', left: isDarkMode ? '29px' : '3px', transition: 'left 0.3s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}>
+                {isDarkMode ? <Moon size={18} color="#000" /> : <Sun size={18} color="#000" />}
+              </div>
+            </div>
+
+            {/* Profile Dropdown */}
+            <div ref={profileDropdownRef} style={{ position: 'relative' }}>
+              <button 
+                onClick={() => setShowProfile(!showProfile)}
+                style={{
+                  width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e2e8f0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                }}
+              >
+                <User size={18} color="#475569" />
+              </button>
             
             {showProfile && (
               <div style={{
@@ -234,8 +307,9 @@ export default function WatchPartyRoomOffline() {
               </div>
             )}
           </div>
+        </div>
 
-          {isConnected ? (
+        {isConnected ? (
             <div className="connected-panel-wrap">
               <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
                 <CheckCircle2 size={18} className="text-green-600" />
@@ -271,7 +345,7 @@ export default function WatchPartyRoomOffline() {
       >
         <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
           <div className="youtube-host">
-            <div style={{ width: '100%', height: '100%', backgroundColor: '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '100%', height: '100%', backgroundColor: isDarkMode ? '#1a1a1a' : '#0f172a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ color: '#475569', fontSize: '1.25rem', fontWeight: 500 }}>
                 Join a party to start watching
               </span>

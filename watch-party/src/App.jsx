@@ -7,6 +7,16 @@ import LocalVideoPartyRoom from './LocalVideoPartyRoom'; // <-- 1. Import local 
 import LandingPage from './LandingPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
+import { CallProvider } from './context/CallContext';
+import { Outlet } from 'react-router-dom';
+
+function RoomLayout() {
+  return (
+    <CallProvider>
+      <Outlet />
+    </CallProvider>
+  );
+}
 
 function AppRoutes() {
   const navigate = useNavigate();
@@ -62,11 +72,12 @@ function AppRoutes() {
       <Route path="/login" element={<LoginPage onLoginSuccess={() => navigate('/room')} onNavigateSignup={() => navigate('/signup')} />} />
       <Route path="/signup" element={<SignupPage onSignupSuccess={() => navigate('/login')} onNavigateLogin={() => navigate('/login')} />} />
       <Route path="/room" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoom /></div>} />
-      <Route path="/party" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoomRefactored /></div>} />
-      <Route path="/screen-share" element={<div className="min-h-screen bg-white py-10"><ScreenShareRoom /></div>} />
       
-      {/* Route: Local Video Sync Room */}
-      <Route path="/local-sync" element={<div className="min-h-screen bg-white py-10"><LocalVideoPartyRoom /></div>} />
+      <Route element={<RoomLayout />}>
+        <Route path="/party" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoomRefactored /></div>} />
+        <Route path="/screen-share" element={<div className="min-h-screen bg-white py-10"><ScreenShareRoom /></div>} />
+        <Route path="/local-sync" element={<div className="min-h-screen bg-white py-10"><LocalVideoPartyRoom /></div>} />
+      </Route>
     </Routes>
   );
 }

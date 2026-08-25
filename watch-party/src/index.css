@@ -83,6 +83,33 @@
 	cursor: pointer;
 }
 
+button.btn-join {
+	font-size: 0.85rem;
+	padding: 0.65rem 1.25rem;
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+	border-radius: 12px;
+	font-weight: 600;
+	background-color: #eff6ff;
+	color: #111111;
+	border: 1px solid #dbeafe;
+	box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+	transition: all 0.2s ease;
+	cursor: pointer;
+}
+
+button.btn-join:hover {
+	transform: translateY(-2px);
+}
+
+button.btn-join.active {
+	background-color: #2563eb;
+	color: #ffffff;
+	border: 1px solid #1d4ed8;
+	box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
 .load-video-btn {
 	background: #2563eb;
 	padding: 0.75rem 1.5rem;
@@ -445,6 +472,7 @@
 	gap: 0.5rem;
 	opacity: 0;
 	transition: opacity 0.2s ease;
+	z-index: 30;
 }
 
 .media-controls--friend {
