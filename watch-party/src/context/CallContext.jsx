@@ -18,7 +18,13 @@ export const CallProvider = ({ children }) => {
   
   const [peerId, setPeerId] = useState("");
   const [friendId, setFriendId] = useState("");
-  const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
+  const [user1Media, setUser1Media] = useState(() => {
+    const saved = sessionStorage.getItem('userMediaPref');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return { mic: false, cam: false };
+  });
   const [user2Media, setUser2Media] = useState({ mic: true, cam: true });
 
   const [isConnected, setIsConnected] = useState(false);
@@ -68,6 +74,7 @@ export const CallProvider = ({ children }) => {
   }, [remoteStream]);
 
   useEffect(() => {
+    sessionStorage.setItem('userMediaPref', JSON.stringify(user1Media));
     user1MediaRef.current = user1Media;
   }, [user1Media]);
 
@@ -95,6 +102,9 @@ export const CallProvider = ({ children }) => {
           stream.getTracks().forEach((track) => track.stop());
           return;
         }
+
+        stream.getAudioTracks().forEach(track => track.enabled = user1Media.mic);
+        stream.getVideoTracks().forEach(track => track.enabled = user1Media.cam);
 
         myStream = stream;
         setLocalStream(myStream);

@@ -222,9 +222,7 @@ export default function ScreenShareRoom() {
           background-color: #1a1a1a !important;
           box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8) !important;
         }
-        body.dark-mode .video-surface > div {
-          background-color: #1a1a1a !important;
-        }
+
       `}</style>
       <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
         
