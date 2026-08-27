@@ -29,13 +29,17 @@ export default function WatchPartyRoomOffline() {
   
   const [showProfile, setShowProfile] = useState(false);
   const [userInfo, setUserInfo] = useState({ name: 'Guest User', username: '@guest' });
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem("theme") === "dark";
+  });
 
   useEffect(() => {
     if (isDarkMode) {
       document.body.classList.add('dark-mode');
+      localStorage.setItem('theme', 'dark');
     } else {
       document.body.classList.remove('dark-mode');
+      localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
 
@@ -79,7 +83,7 @@ export default function WatchPartyRoomOffline() {
   const [cam1Pos, setCam1Pos] = useState({ x: 0, y: 0 });
   const [cam2Pos, setCam2Pos] = useState({ x: 0, y: 0 });
 
-  const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
+  const [user1Media] = useState({ mic: false, cam: false });
   const [user2Media, setUser2Media] = useState({ mic: true, cam: true });
   
   const [friendId, setFriendId] = useState("");
@@ -110,8 +114,7 @@ export default function WatchPartyRoomOffline() {
     }
   };
 
-  const toggleLocalMic = () => setUser1Media(prev => ({ ...prev, mic: !prev.mic }));
-  const toggleLocalCam = () => setUser1Media(prev => ({ ...prev, cam: !prev.cam }));
+
 
   const callFriend = () => {
     if(friendId) setIsConnected(true);
@@ -131,10 +134,15 @@ export default function WatchPartyRoomOffline() {
         body.dark-mode .watch-party-room {
           background-color: #121212 !important;
         }
-        body.dark-mode .btn-join, body.dark-mode .load-video-btn, body.dark-mode .connect-btn {
+        body.dark-mode button.btn-join, body.dark-mode .load-video-btn, body.dark-mode .connect-btn {
           background-color: #1f2937 !important;
           color: #e5e5e5 !important;
           border-color: #374151 !important;
+        }
+        body.dark-mode button.btn-join.active {
+          background-color: #2563eb !important;
+          color: #ffffff !important;
+          border-color: #1d4ed8 !important;
         }
         body.dark-mode .url-input {
           background-color: #1f2937 !important;
@@ -158,9 +166,7 @@ export default function WatchPartyRoomOffline() {
           background-color: #1a1a1a !important;
           box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8) !important;
         }
-        body.dark-mode .video-surface > div {
-          background-color: #1a1a1a !important;
-        }
+
       `}</style>
       <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
         
@@ -376,44 +382,41 @@ export default function WatchPartyRoomOffline() {
               }`}
             >
               <div className="video-surface">
-                {/* Dummy video surface */}
-                <div style={{
-                  width: "100%", 
-                  height: "100%", 
-                  backgroundColor: "#333", 
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  textAlign: "center",
-                  padding: "1rem"
-                }}>
-                  <span style={{ color: "#aaa", fontSize: "0.85rem" }}>Waiting for your camera</span>
+                <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden' }}>
+                  {/* Dummy placeholder instead of actual video */}
+                  <div style={{ width: "100%", height: "100%", backgroundColor: "#333" }} />
                 </div>
-                <div className="participant-tag-wrap">
+                {!user1Media.cam && (
+                  <div className="waiting-overlay">
+                    <VideoOff className="waiting-icon" />
+                    <span className="waiting-text">Camera Off</span>
+                  </div>
+                )}
+                <div className="participant-tag-wrap" style={{ zIndex: 30 }}>
                   <span className="participant-tag">You</span>
+                  <div className="local-volume-meter">
+                    <div className="local-volume-fill" style={{ height: '0%' }} />
+                  </div>
                 </div>
               </div>
               <div className="media-controls">
                 <button
-                  onClick={toggleLocalMic}
+                  disabled
                   onMouseDown={(e) => e.stopPropagation()}
-                  className={`media-toggle-btn ${
-                    user1Media.mic ? "is-on" : "is-off"
-                  }`}
-                  title={user1Media.mic ? "Mute Microphone" : "Unmute Microphone"}
+                  className={`media-toggle-btn is-off`}
+                  title="Microphone disabled in offline mode"
+                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 >
-                  {user1Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
+                  <MicOff size={18} />
                 </button>
                 <button
-                  onClick={toggleLocalCam}
+                  disabled
                   onMouseDown={(e) => e.stopPropagation()}
-                  className={`media-toggle-btn ${
-                    user1Media.cam ? "is-on" : "is-off"
-                  }`}
-                  title={user1Media.cam ? "Turn Off Camera" : "Turn On Camera"}
+                  className={`media-toggle-btn is-off`}
+                  title="Camera disabled in offline mode"
+                  style={{ opacity: 0.5, cursor: 'not-allowed' }}
                 >
-                  {user1Media.cam ? <Video size={18} /> : <VideoOff size={18} />}
+                  <VideoOff size={18} />
                 </button>
               </div>
             </div>
