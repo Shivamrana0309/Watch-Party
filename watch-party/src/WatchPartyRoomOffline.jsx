@@ -30,17 +30,16 @@ export default function WatchPartyRoomOffline() {
   const [showProfile, setShowProfile] = useState(false);
   const [userInfo, setUserInfo] = useState({ name: 'Guest User', username: '@guest' });
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = localStorage.getItem('isDarkMode');
-    return savedTheme === 'true';
+    return localStorage.getItem("theme") === "dark";
   });
 
   useEffect(() => {
     if (isDarkMode) {
       document.body.classList.add('dark-mode');
-      localStorage.setItem('isDarkMode', 'true');
+      localStorage.setItem('theme', 'dark');
     } else {
       document.body.classList.remove('dark-mode');
-      localStorage.setItem('isDarkMode', 'false');
+      localStorage.setItem('theme', 'light');
     }
   }, [isDarkMode]);
 
