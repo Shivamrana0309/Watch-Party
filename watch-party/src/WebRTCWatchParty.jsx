@@ -87,7 +87,7 @@ export default function WebRTCWatchParty() {
     const initPeer = async () => {
       let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
       
-      const backendUrlStr = import.meta.env.VITE_BACKEND_URL || '';
+      const backendUrlStr = import.meta.env.VITE_BACKEND_URL || 'https://watch-party-74e5.onrender.com';
       
       try {
         const fetchUrl = backendUrlStr ? `${backendUrlStr}/api/turn-credentials` : '/api/turn-credentials';
