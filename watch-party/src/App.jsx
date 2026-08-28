@@ -4,6 +4,7 @@ import WatchPartyRoom from './WatchPartyRoom';
 import WatchPartyRoomRefactored from './WatchPartyRoomRefactored';
 import ScreenShareRoom from './ScreenShareRoom';
 import LocalVideoPartyRoom from './LocalVideoPartyRoom'; // <-- 1. Import local sync room
+import WebRTCWatchParty from './WebRTCWatchParty';
 import LandingPage from './LandingPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
@@ -66,6 +67,7 @@ function AppRoutes() {
             onJoinPartyClick={() => navigate('/party')}
             onScreenShareClick={() => navigate('/screen-share')}
             onLocalSyncClick={() => navigate('/local-sync')} // <-- 2. Pass local sync callback
+            onWebRTCWatchPartyClick={() => navigate('/watch-party')}
           />
         } 
       />
@@ -77,6 +79,7 @@ function AppRoutes() {
         <Route path="/party" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoomRefactored /></div>} />
         <Route path="/screen-share" element={<div className="min-h-screen bg-white py-10"><ScreenShareRoom /></div>} />
         <Route path="/local-sync" element={<div className="min-h-screen bg-white py-10"><LocalVideoPartyRoom /></div>} />
+        <Route path="/watch-party" element={<div className="min-h-screen bg-gray-50 py-10"><WebRTCWatchParty /></div>} />
       </Route>
     </Routes>
   );

@@ -6,7 +6,8 @@ export default function LandingPage({
   onSignupClick, 
   onJoinPartyClick,
   onScreenShareClick, 
-  onLocalSyncClick 
+  onLocalSyncClick,
+  onWebRTCWatchPartyClick
 }) {
   return (
     <div className="landing-body">
@@ -60,6 +61,14 @@ export default function LandingPage({
                   <line x1="12" y1="17" x2="12" y2="21"></line>
                 </svg>
                 SHARE SCREEN
+              </button>
+
+              <button className="btn btn-join" onClick={onWebRTCWatchPartyClick} style={{ backgroundColor: '#8b5cf6' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+                  <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                  <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+                </svg>
+                WEBRTC PARTY
               </button>
             </div>
           </div>
