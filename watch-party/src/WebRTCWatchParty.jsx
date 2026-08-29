@@ -8,6 +8,42 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
+const applyBandwidthOptimizations = (call, type) => {
+  if (!call || !call.peerConnection) return;
+  const pc = call.peerConnection;
+
+  const applyParams = () => {
+    const senders = pc.getSenders();
+    senders.forEach((sender) => {
+      if (!sender.track) return;
+      const params = sender.getParameters();
+      if (!params.encodings) params.encodings = [{}];
+
+      if (type === 'webcam') {
+        if (sender.track.kind === 'video') {
+          params.encodings[0].maxBitrate = 200000;
+          params.encodings[0].networkPriority = 'low';
+        } else if (sender.track.kind === 'audio') {
+          params.encodings[0].networkPriority = 'high';
+        }
+      }
+      try {
+        sender.setParameters(params);
+      } catch (e) {
+        console.warn("Could not set RTCRtpSender parameters", e);
+      }
+    });
+  };
+
+  if (pc.connectionState === 'connected') {
+    applyParams();
+  } else {
+    pc.addEventListener('connectionstatechange', () => {
+      if (pc.connectionState === 'connected') applyParams();
+    });
+  }
+};
+
 export default function WebRTCWatchParty() {
   const navigate = useNavigate();
   const [peerId, setPeerId] = useState('');
@@ -58,6 +94,14 @@ export default function WebRTCWatchParty() {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [networkQuality, setNetworkQuality] = useState('Good');
   
+  const [incomingCall, setIncomingCall] = useState(null);
+  const [isCalling, setIsCalling] = useState(false);
+  
+  // Webcam State
+  const [localCamStream, setLocalCamStream] = useState(null);
+  const [remoteCamStream, setRemoteCamStream] = useState(null);
+  const localCamStreamRef = useRef(null);
+  
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimeoutRef = useRef(null);
 
@@ -83,8 +127,11 @@ export default function WebRTCWatchParty() {
   // Refs
   const peerInstance = useRef(null);
   const mediaCallRef = useRef(null);
+  const camCallRef = useRef(null);
   const connectionRef = useRef(null);
   const streamRef = useRef(null);
+  const localVideoCamRef = useRef(null);
+  const remoteVideoCamRef = useRef(null);
   
   // Fallback Refs
   const canvasRef = useRef(null);
@@ -179,6 +226,24 @@ export default function WebRTCWatchParty() {
     let isMounted = true;
 
     const initPeer = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
+          audio: true,
+        });
+        if (!isMounted) {
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        setLocalCamStream(stream);
+        localCamStreamRef.current = stream;
+        if (localVideoCamRef.current) {
+          localVideoCamRef.current.srcObject = stream;
+        }
+      } catch (err) {
+        console.warn("Could not access webcam/mic", err);
+      }
+
       let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
       const backendUrlStr = import.meta.env.VITE_BACKEND_URL || 'https://watch-party-74e5.onrender.com';
       
@@ -230,14 +295,9 @@ export default function WebRTCWatchParty() {
 
       peer.on('connection', (conn) => {
         if (!isMounted) return;
-        setConnectionStatus('Connecting...');
         
-        conn.on('open', () => {
-          if (isMounted) {
-            setConnectionStatus(`Connected to ${conn.peer}`);
-            setConnection(conn);
-          }
-        });
+        setIncomingCall(conn);
+        setConnectionStatus(`Incoming call from ${conn.peer}`);
 
         conn.on('data', (data) => {
           if (handleIncomingDataRef.current) handleIncomingDataRef.current(data);
@@ -247,6 +307,10 @@ export default function WebRTCWatchParty() {
           if (isMounted) {
              setConnectionStatus('Disconnected');
              setConnection(null);
+             setIncomingCall((currentCall) => {
+               if (currentCall && currentCall.peer === conn.peer) return null;
+               return currentCall;
+             });
           }
         });
         
@@ -258,16 +322,31 @@ export default function WebRTCWatchParty() {
 
       peer.on('call', (call) => {
         if (!isMounted) return;
-        call.answer();
 
-        call.on('stream', (remoteStream) => {
-          if (videoRef.current) {
-            videoRef.current.removeAttribute('src');
-            videoRef.current.srcObject = remoteStream;
-            videoRef.current.play().catch(e => console.error("Autoplay blocked:", e));
-            startStatsMonitoring(call, false);
-          }
-        });
+        if (call.metadata && call.metadata.type === 'WEBCAM') {
+          call.answer(localCamStreamRef.current);
+          applyBandwidthOptimizations(call, 'webcam');
+          camCallRef.current = call;
+          call.on('stream', (remoteStream) => {
+            if (isMounted) {
+              setRemoteCamStream(remoteStream);
+              if (remoteVideoCamRef.current) {
+                remoteVideoCamRef.current.srcObject = remoteStream;
+              }
+            }
+          });
+        } else {
+          call.answer();
+
+          call.on('stream', (remoteStream) => {
+            if (videoRef.current) {
+              videoRef.current.removeAttribute('src');
+              videoRef.current.srcObject = remoteStream;
+              videoRef.current.play().catch(e => console.error("Autoplay blocked:", e));
+              startStatsMonitoring(call, false);
+            }
+          });
+        }
       });
 
       peer.on('error', (err) => {
@@ -288,6 +367,10 @@ export default function WebRTCWatchParty() {
       if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
+      }
+      if (localCamStreamRef.current) {
+        localCamStreamRef.current.getTracks().forEach(t => t.stop());
+        localCamStreamRef.current = null;
       }
     };
   }, []);
@@ -324,35 +407,115 @@ export default function WebRTCWatchParty() {
           }
         }
       }
+    } else if (data.type === 'MEDIA_STATE') {
+      setUser2Media({ mic: data.mic, cam: data.cam });
+    }
+  };
+
+  const toggleMic = () => {
+    const newState = !user1Media.mic;
+    setUser1Media(prev => ({ ...prev, mic: newState }));
+    if (localCamStreamRef.current) {
+      localCamStreamRef.current.getAudioTracks().forEach(t => t.enabled = newState);
+    }
+    if (connectionRef.current && connectionRef.current.open) {
+      connectionRef.current.send({ type: 'MEDIA_STATE', mic: newState, cam: user1Media.cam });
+    }
+  };
+
+  const toggleCam = () => {
+    const newState = !user1Media.cam;
+    setUser1Media(prev => ({ ...prev, cam: newState }));
+    if (localCamStreamRef.current) {
+      localCamStreamRef.current.getVideoTracks().forEach(t => t.enabled = newState);
+    }
+    if (connectionRef.current && connectionRef.current.open) {
+      connectionRef.current.send({ type: 'MEDIA_STATE', mic: user1Media.mic, cam: newState });
     }
   };
 
   const connectToPeer = () => {
-    if (!remotePeerId.trim()) return;
+    const targetId = remotePeerId.trim().toUpperCase();
+    if (!targetId) return;
     const peer = peerInstance.current;
     if (!peer) return;
 
-    setConnectionStatus('Connecting...');
-    const conn = peer.connect(remotePeerId);
+    setIsCalling(true);
+    setConnectionStatus(`Calling ${targetId}...`);
+    const conn = peer.connect(targetId);
+    connectionRef.current = conn;
 
     conn.on('open', () => {
-      setConnectionStatus(`Connected to ${conn.peer}`);
-      setConnection(conn);
+      // Don't set Connected yet. We wait for CALL_ACCEPTED via data event.
     });
 
     conn.on('data', (data) => {
-      if (handleIncomingDataRef.current) handleIncomingDataRef.current(data);
+      if (data.type === 'CALL_ACCEPTED') {
+        setIsCalling(false);
+        setConnectionStatus(`Connected to ${conn.peer}`);
+        setConnection(conn);
+
+        // Initiate WEBCAM call to the peer
+        if (localCamStreamRef.current) {
+          const camCall = peerInstance.current.call(conn.peer, localCamStreamRef.current, { metadata: { type: 'WEBCAM' } });
+          applyBandwidthOptimizations(camCall, 'webcam');
+          camCallRef.current = camCall;
+          camCall.on('stream', (remoteStream) => {
+            if (isMounted) {
+              setRemoteCamStream(remoteStream);
+              if (remoteVideoCamRef.current) {
+                remoteVideoCamRef.current.srcObject = remoteStream;
+              }
+            }
+          });
+        }
+        
+      } else if (data.type === 'CALL_REJECTED') {
+        setIsCalling(false);
+        setConnectionStatus('Call rejected by peer');
+        conn.close();
+        setConnection(null);
+      } else if (handleIncomingDataRef.current) {
+        handleIncomingDataRef.current(data);
+      }
     });
 
     conn.on('close', () => {
-      setConnectionStatus('Disconnected');
+      setIsCalling(false);
+      setConnectionStatus((prev) => prev === 'Call rejected by peer' ? prev : 'Disconnected');
       setConnection(null);
     });
     
     conn.on('error', (err) => {
       console.error('Connection error:', err);
+      setIsCalling(false);
       setConnectionStatus('Error');
     });
+  };
+
+  const acceptCall = () => {
+    if (!incomingCall) return;
+    setConnection(incomingCall);
+    setConnectionStatus(`Connected to ${incomingCall.peer}`);
+    incomingCall.send({ type: 'CALL_ACCEPTED' });
+    setIncomingCall(null);
+  };
+
+  const rejectCall = () => {
+    if (!incomingCall) return;
+    incomingCall.send({ type: 'CALL_REJECTED' });
+    setTimeout(() => incomingCall.close(), 500);
+    setIncomingCall(null);
+    setConnectionStatus('Disconnected');
+  };
+  
+  const cancelCall = () => {
+    if (connectionRef.current) {
+      connectionRef.current.close();
+      connectionRef.current = null;
+    }
+    setIsCalling(false);
+    setConnectionStatus('Disconnected');
   };
 
   const handleFileChange = (e) => {
@@ -821,13 +984,24 @@ export default function WebRTCWatchParty() {
                 Leave Call
               </button>
             </div>
+          ) : isCalling ? (
+            <div className="connected-panel-wrap">
+              <div className="connected-badge" style={{ whiteSpace: 'nowrap', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
+                <PhoneCall size={18} className="animate-pulse" />
+                <span>Calling <strong>{remotePeerId}</strong>...</span>
+              </div>
+              <button onClick={cancelCall} className="leave-btn" style={{ backgroundColor: '#ef4444' }} title="Cancel Call">
+                <PhoneOff size={16} />
+                Cancel
+              </button>
+            </div>
           ) : (
             <>
               <input
                 type="text"
                 placeholder="Partner's ID"
                 value={remotePeerId}
-                onChange={(e) => setRemotePeerId(e.target.value)}
+                onChange={(e) => setRemotePeerId(e.target.value.toUpperCase())}
                 className="friend-id-input"
                 style={{ textTransform: "uppercase", height: '36px' }}
               />
@@ -862,6 +1036,44 @@ export default function WebRTCWatchParty() {
               onWaiting={handleWaiting}
               style={{ width: "100%", height: "100%", objectFit: "contain", cursor: controlsVisible ? "pointer" : "none", display: videoUrlRef.current || (connectionStatus.startsWith('Connected') && !isStreamer) ? "block" : "none" }}
             />
+            {incomingCall && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "50%",
+                  left: "50%",
+                  transform: "translate(-50%, -50%)",
+                  backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
+                  padding: "2rem",
+                  borderRadius: "1rem",
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  gap: "1.5rem",
+                  zIndex: 100,
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb'
+                }}
+              >
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ display: "inline-flex", padding: "1rem", borderRadius: "9999px", backgroundColor: "#dbeafe", color: "#2563eb", marginBottom: "1rem" }}>
+                    <PhoneCall size={32} className="animate-pulse" />
+                  </div>
+                  <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "600", color: isDarkMode ? '#f8fafc' : '#1e293b' }}>Incoming Call</h3>
+                  <p style={{ margin: "0.5rem 0 0 0", color: isDarkMode ? '#94a3b8' : '#64748b' }}>
+                    <strong style={{ color: isDarkMode ? '#e2e8f0' : '#334155' }}>{incomingCall.peer}</strong> wants to connect.
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: "1rem", width: "100%" }}>
+                  <button onClick={rejectCall} style={{ flex: 1, padding: "0.75rem", borderRadius: "0.5rem", border: "none", backgroundColor: "#fee2e2", color: "#ef4444", fontWeight: "600", cursor: "pointer", transition: "all 0.2s" }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fecaca'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}>
+                    Reject
+                  </button>
+                  <button onClick={acceptCall} style={{ flex: 1, padding: "0.75rem", borderRadius: "0.5rem", border: "none", backgroundColor: "#dcfce3", color: "#16a34a", fontWeight: "600", cursor: "pointer", transition: "all 0.2s" }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#bbf7d0'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dcfce3'}>
+                    Accept
+                  </button>
+                </div>
+              </div>
+            )}
             {(!videoUrlRef.current && (!connectionStatus.startsWith('Connected') || (connectionStatus.startsWith('Connected') && isStreamer && !videoUrlRef.current))) && (
               <div
                 style={{
@@ -954,7 +1166,13 @@ export default function WebRTCWatchParty() {
               className={`video-card video-card--self ${isFullscreen ? "is-fullscreen" : "is-inline"}`}
             >
               <div className="video-surface">
-                <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden', backgroundColor: '#333' }} />
+                <video
+                  ref={localVideoCamRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#333' }}
+                />
                 {!user1Media.cam && (
                   <div className="waiting-overlay">
                     <VideoOff className="waiting-icon" />
@@ -970,7 +1188,7 @@ export default function WebRTCWatchParty() {
               </div>
               <div className="media-controls">
                 <button
-                  onClick={() => setUser1Media({ ...user1Media, mic: !user1Media.mic })}
+                  onClick={toggleMic}
                   onMouseDown={(e) => e.stopPropagation()}
                   className={`media-toggle-btn ${user1Media.mic ? "is-on" : "is-off"}`}
                   title={user1Media.mic ? "Mute Microphone" : "Unmute Microphone"}
@@ -978,7 +1196,7 @@ export default function WebRTCWatchParty() {
                   {user1Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
                 </button>
                 <button
-                  onClick={() => setUser1Media({ ...user1Media, cam: !user1Media.cam })}
+                  onClick={toggleCam}
                   onMouseDown={(e) => e.stopPropagation()}
                   className={`media-toggle-btn ${user1Media.cam ? "is-on" : "is-off"}`}
                   title={user1Media.cam ? "Turn Off Camera" : "Turn On Camera"}
@@ -1001,7 +1219,12 @@ export default function WebRTCWatchParty() {
               className={`video-card video-card--friend ${isFullscreen ? "is-fullscreen" : "is-inline"}`}
             >
               <div className="video-surface video-surface--friend">
-                <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden', backgroundColor: '#222' }} />
+                <video
+                  ref={remoteVideoCamRef}
+                  autoPlay
+                  playsInline
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#222' }}
+                />
 
                 {!connectionStatus.startsWith('Connected') && (
                   <div className="waiting-overlay">
