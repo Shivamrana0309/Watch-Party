@@ -172,15 +172,16 @@ export default function WatchPartyRoomOffline() {
         
         {/* Left: Buttons + YouTube URL */}
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
             <button className="btn btn-join" onClick={() => window.location.href='/party'} style={{ 
               fontSize: '0.85rem', 
               padding: '0.65rem 1.25rem',
               border: '1px solid #dbeafe', 
               backgroundColor: '#eff6ff', 
-              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+              whiteSpace: 'nowrap'
             }}>
-              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               JOIN A PARTY
@@ -190,9 +191,10 @@ export default function WatchPartyRoomOffline() {
               padding: '0.65rem 1.25rem',
               border: '1px solid #dbeafe', 
               backgroundColor: '#eff6ff', 
-              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+              whiteSpace: 'nowrap'
             }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
               </svg>
               SYNC LOCAL VIDEO
@@ -202,14 +204,29 @@ export default function WatchPartyRoomOffline() {
               padding: '0.65rem 1.25rem',
               border: '1px solid #dbeafe', 
               backgroundColor: '#eff6ff', 
-              boxShadow: '0 1px 2px rgba(0,0,0,0.06)'
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+              whiteSpace: 'nowrap'
             }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
               </svg>
               SHARE SCREEN
+            </button>
+            <button className="btn btn-join" onClick={() => window.location.href='/watch-party'} style={{ 
+              fontSize: '0.85rem', 
+              padding: '0.65rem 1.25rem',
+              border: '1px solid #dbeafe', 
+              backgroundColor: '#eff6ff', 
+              boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+              whiteSpace: 'nowrap'
+            }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              WEBRTC PARTY
             </button>
           </div>
           <form onSubmit={handleUrlSubmit} className="watch-party-form" style={{ margin: 0, padding: 0 }}>

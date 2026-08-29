@@ -200,7 +200,7 @@ export default function WebRTCWatchParty() {
         peerOptions.secure = true;
       }
 
-      const customId = Math.random().toString(36).substring(2, 8).toLowerCase();
+      const customId = Math.random().toString(36).substring(2, 8).toUpperCase();
       const peer = new Peer(customId, peerOptions);
       peerInstance.current = peer;
 
@@ -597,17 +597,34 @@ export default function WebRTCWatchParty() {
   };
 
   const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      containerRef.current?.requestFullscreen().catch(() => {});
+    const isFull = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement;
+    if (!isFull) {
+      if (containerRef.current?.requestFullscreen) {
+        containerRef.current.requestFullscreen().catch(() => {});
+      } else if (containerRef.current?.webkitRequestFullscreen) {
+        containerRef.current.webkitRequestFullscreen();
+      }
     } else {
-      document.exitFullscreen();
+      if (document.exitFullscreen) {
+        document.exitFullscreen().catch(() => {});
+      } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+      }
     }
   };
 
   useEffect(() => {
-    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement));
+    };
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+    document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+    document.addEventListener("mozfullscreenchange", handleFullscreenChange);
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      document.removeEventListener("webkitfullscreenchange", handleFullscreenChange);
+      document.removeEventListener("mozfullscreenchange", handleFullscreenChange);
+    };
   }, []);
 
   return (
@@ -652,20 +669,19 @@ export default function WebRTCWatchParty() {
       <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
-            <button className="btn-join" onClick={() => navigate('/party')}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
-                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
-                <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
+            <button className="btn-join" onClick={() => navigate('/party')} style={{ whiteSpace: 'nowrap' }}>
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               JOIN A PARTY
             </button>
-            <button className="btn-join" onClick={() => navigate('/local-video')}>
+            <button className="btn-join" onClick={() => navigate('/local-sync')} style={{ whiteSpace: 'nowrap' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
               </svg>
               SYNC LOCAL VIDEO
             </button>
-            <button className="btn-join" onClick={() => navigate('/screen-share')}>
+            <button className="btn-join" onClick={() => navigate('/screen-share')} style={{ whiteSpace: 'nowrap' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -673,9 +689,12 @@ export default function WebRTCWatchParty() {
               </svg>
               SHARE SCREEN
             </button>
-            <button className="btn-join active" onClick={() => navigate('/webrtc')}>
-              <Globe style={{ marginRight: '6px', width: '16px', height: '16px' }} />
-              WEBRTC PAGE
+            <button className="btn-join active" onClick={() => navigate('/watch-party')} style={{ whiteSpace: 'nowrap' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              WEBRTC PARTY
             </button>
           </div>
 
@@ -808,7 +827,7 @@ export default function WebRTCWatchParty() {
         <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
           <div
             className="local-video-host"
-            style={{ width: "100%", height: "100%", backgroundColor: isDarkMode ? '#1a1a1a' : '#000', position: "relative" }}
+            style={{ width: "100%", height: isFullscreen ? "100%" : "auto", aspectRatio: isFullscreen ? "auto" : "16 / 9", backgroundColor: isDarkMode ? '#1a1a1a' : '#000', position: "relative" }}
           >
             <video 
               ref={videoRef}
@@ -884,7 +903,7 @@ export default function WebRTCWatchParty() {
                 </div>
 
                 <div className="flex items-center gap-4">
-                  <button onClick={toggleFullscreen} className="text-gray-300 hover:text-white transition-colors" style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                  <button type="button" onClick={toggleFullscreen} className="text-gray-300 hover:text-white transition-colors" style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex' }}>
                     {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
                   </button>
                 </div>
