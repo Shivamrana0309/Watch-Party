@@ -39,7 +39,7 @@ export default function LandingPage({
             
             <div className="dark-card-graphics"></div>
 
-            <div className="action-area" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+            <div className="action-area" style={{ display: 'flex', gap: '0.75rem', flexWrap: 'nowrap', alignItems: 'center' }}>
               <button className="btn btn-join" onClick={onJoinPartyClick}>
                 <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="5 3 19 12 5 21 5 3"></polygon>

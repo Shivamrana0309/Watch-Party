@@ -1,13 +1,56 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Peer from 'peerjs';
+import Draggable from 'react-draggable';
+import {
+  Maximize, Minimize, Mic, MicOff, Video as VideoIcon, VideoOff,
+  FolderOpen, Copy, PhoneCall, PhoneOff, CheckCircle2, Play, Pause,
+  User, Sun, Moon, Globe
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 export default function WebRTCWatchParty() {
+  const navigate = useNavigate();
   const [peerId, setPeerId] = useState('');
   const [remotePeerId, setRemotePeerId] = useState('');
   const [connection, setConnection] = useState(null);
   const [connectionStatus, setConnectionStatus] = useState('Disconnected');
   
   // UI & Player State
+  const [fileName, setFileName] = useState("");
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
+  const [showProfile, setShowProfile] = useState(false);
+  const [userInfo] = useState({ name: 'Guest User', username: '@guest' });
+  const [cam1Pos, setCam1Pos] = useState({ x: 0, y: 0 });
+  const [cam2Pos, setCam2Pos] = useState({ x: 0, y: 0 });
+  const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
+  const [user2Media, setUser2Media] = useState({ mic: false, cam: false });
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  const containerRef = useRef(null);
+  const user1Ref = useRef(null);
+  const user2Ref = useRef(null);
+  const profileDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.body.classList.add("dark-mode");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.body.classList.remove("dark-mode");
+      localStorage.setItem("theme", "light");
+    }
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
+        setShowProfile(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const [isStreamer, setIsStreamer] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -128,7 +171,9 @@ export default function WebRTCWatchParty() {
         peerOptions.secure = true;
       }
 
-      const peer = new Peer(peerOptions);
+      // Generate a 6-character alphanumeric ID for the room
+      const customId = Math.random().toString(36).substring(2, 8).toLowerCase();
+      const peer = new Peer(customId, peerOptions);
       peerInstance.current = peer;
 
       peer.on('open', (id) => {
@@ -274,6 +319,7 @@ export default function WebRTCWatchParty() {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      setFileName(file.name);
       if (videoUrlRef.current) {
         URL.revokeObjectURL(videoUrlRef.current);
       }
@@ -422,9 +468,17 @@ export default function WebRTCWatchParty() {
 
   // --- Synchronization Engine (Streamer Source of Truth) ---
   const sendSyncState = () => {
-    if (!isStreamer || !videoRef.current || !connectionRef.current || !connectionRef.current.open) return;
+    if (!isStreamer || !videoRef.current) return;
+    
     const video = videoRef.current;
     
+    // Always update local UI state immediately, regardless of connection
+    setCurrentTime(video.currentTime);
+    setDuration(video.duration || 0);
+    setIsPaused(video.paused);
+
+    if (!connectionRef.current || !connectionRef.current.open) return;
+
     const now = Date.now();
     // Throttle to 250ms to avoid flooding
     if (now - lastSyncTime.current < 250) return;
@@ -436,11 +490,6 @@ export default function WebRTCWatchParty() {
       duration: video.duration || 0,
       isPaused: video.paused
     });
-    
-    // Also update local UI state immediately
-    setCurrentTime(video.currentTime);
-    setDuration(video.duration || 0);
-    setIsPaused(video.paused);
   };
 
   const handleTimeUpdate = () => {
@@ -451,19 +500,23 @@ export default function WebRTCWatchParty() {
 
   const handlePlayPauseEvent = () => {
     if (isStreamer) {
-      // Force sync bypass throttle
       const video = videoRef.current;
-      if (!video || !connectionRef.current || !connectionRef.current.open) return;
+      if (!video) return;
+
+      // Update local state even if not connected
+      setCurrentTime(video.currentTime);
+      setDuration(video.duration || 0);
+      setIsPaused(video.paused);
+
+      if (!connectionRef.current || !connectionRef.current.open) return;
       
+      // Force sync bypass throttle
       connectionRef.current.send({
         type: 'SYNC_STATE',
         currentTime: video.currentTime,
         duration: video.duration || 0,
         isPaused: video.paused
       });
-      setCurrentTime(video.currentTime);
-      setDuration(video.duration || 0);
-      setIsPaused(video.paused);
       lastSyncTime.current = Date.now();
     }
   };
@@ -520,126 +573,417 @@ export default function WebRTCWatchParty() {
     navigator.clipboard.writeText(peerId);
   };
 
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      containerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    const handleFullscreenChange = () => setIsFullscreen(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
+  }, []);
+
   return (
-    <div className="flex flex-col items-center p-8 max-w-5xl mx-auto w-full">
-      <h1 className="text-3xl font-bold mb-8 text-gray-900">WebRTC Watch Party</h1>
-      
-      {/* Connection UI Header (Minimal) */}
-      <div className="w-full bg-white p-4 rounded-lg mb-6 shadow-sm border border-gray-200 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div>
-            <div className="text-xs text-gray-500 mb-1">Your ID</div>
-            <div className="flex items-center">
-              <span className="font-mono bg-gray-100 px-2 py-1 rounded text-sm select-all">{peerId || '...'}</span>
-              <button onClick={copyToClipboard} className="ml-2 text-blue-600 hover:text-blue-800 text-sm font-medium">Copy</button>
+    <div className="watch-party-room">
+      <style>{`
+        body.dark-mode {
+          background-color: #121212 !important;
+          color: #e5e5e5 !important;
+        }
+        body.dark-mode .watch-party-room {
+          background-color: #121212 !important;
+        }
+        body.dark-mode button.btn-join, body.dark-mode .connect-btn {
+          background-color: #1f2937 !important;
+          color: #e5e5e5 !important;
+          border-color: #374151 !important;
+        }
+        body.dark-mode button.btn-join.active {
+          background-color: #2563eb !important;
+          color: #ffffff !important;
+          border-color: #1d4ed8 !important;
+        }
+        body.dark-mode .room-id-panel, body.dark-mode .friend-connect-panel, body.dark-mode .connected-panel-wrap {
+          background-color: #1e1e1e !important;
+          border-color: #333 !important;
+          color: #e5e5e5 !important;
+        }
+        body.dark-mode .room-id-label, body.dark-mode .room-id-code, body.dark-mode .friend-id-input {
+          color: #e5e5e5 !important;
+          background-color: transparent !important;
+        }
+        body.dark-mode .friend-id-input {
+          background-color: #1f2937 !important;
+          border-color: #374151 !important;
+        }
+        body.dark-mode .player-panel {
+          background-color: #1a1a1a !important;
+          box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8) !important;
+        }
+      `}</style>
+
+      <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
+        
+        {/* Left: Buttons, Upload & File Names */}
+        <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
+            <button className="btn-join" onClick={() => navigate('/party')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
+                <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
+              </svg>
+              JOIN A PARTY
+            </button>
+            <button className="btn-join" onClick={() => navigate('/local-video')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+              </svg>
+              SYNC LOCAL VIDEO
+            </button>
+            <button className="btn-join" onClick={() => navigate('/screen-share')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              SHARE SCREEN
+            </button>
+            <button className="btn-join active" onClick={() => navigate('/webrtc')}>
+              <Globe style={{ marginRight: '6px', width: '16px', height: '16px' }} />
+              WEBRTC PAGE
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: '1rem', margin: 0, height: '52px', alignItems: 'center' }}>
+            <label className="btn btn-join" style={{ 
+              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", 
+              fontSize: '0.85rem', padding: '0.65rem 1.25rem', border: '1px solid #dbeafe', backgroundColor: '#eff6ff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', margin: 0, height: '100%'
+            }}>
+              <FolderOpen size={16} />
+              UPLOAD VIDEO
+              <input type="file" accept="video/mp4,video/webm" onChange={handleFileChange} style={{ display: "none" }} />
+            </label>
+
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '100%', marginLeft: '0.5rem' }}>
+              <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "#475569", whiteSpace: "nowrap", flex: 1 }}>
+                <strong>Your File:</strong> &nbsp;{fileName || "None"}
+              </div>
             </div>
           </div>
         </div>
-        
-        <div className="flex items-center gap-3 w-full md:w-auto">
-          {!connectionStatus.startsWith('Connected') && (
+
+        {/* Middle: Room ID */}
+        <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
+          <span className="room-id-label" style={{ whiteSpace: 'nowrap' }}>
+            {connectionStatus.startsWith('Connected') ? "Active Room ID:" : "Your Room ID:"}
+          </span>
+          <code className="room-id-code">{peerId || "Generating..."}</code>
+          <button
+            onClick={copyToClipboard}
+            className="copy-id-btn"
+            title="Copy Room ID"
+          >
+            <Copy size={16} />
+          </button>
+        </div>
+
+        {/* Right: Friend Connect (with absolute positioned Profile & Theme Toggle above) */}
+        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative' }}>
+          
+          <div style={{ position: 'absolute', top: '-60px', right: '0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {/* Theme Toggle Switch */}
+            <div 
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              style={{
+                width: '64px', height: '38px', borderRadius: '19px', 
+                backgroundColor: isDarkMode ? '#374151' : '#cbd5e1',
+                display: 'flex', alignItems: 'center', cursor: 'pointer', position: 'relative',
+                transition: 'background-color 0.3s',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+              }}
+            >
+              <div style={{
+                width: '32px', height: '32px', borderRadius: '50%', backgroundColor: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                position: 'absolute', left: isDarkMode ? '29px' : '3px', transition: 'left 0.3s',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.2)'
+              }}>
+                {isDarkMode ? <Moon size={18} color="#000" /> : <Sun size={18} color="#000" />}
+              </div>
+            </div>
+
+            {/* Profile Dropdown */}
+            <div ref={profileDropdownRef} style={{ position: 'relative' }}>
+              <button 
+                onClick={() => setShowProfile(!showProfile)}
+                style={{
+                  width: '38px', height: '38px', borderRadius: '50%', backgroundColor: '#e2e8f0',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer',
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+                }}
+              >
+                <User size={18} color="#475569" />
+              </button>
+            
+              {showProfile && (
+                <div style={{
+                  position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem',
+                  backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem',
+                  boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
+                  width: '180px', padding: '1rem', zIndex: 50,
+                  display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left'
+                }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{userInfo.name}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{userInfo.username}</span>
+                  </div>
+                  <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: 0 }} />
+                  <button 
+                    onClick={() => {
+                      localStorage.removeItem('token');
+                      window.location.href='/';
+                    }} 
+                    style={{
+                      backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '0.25rem',
+                      padding: '0.4rem', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500, width: '100%'
+                    }}
+                  >
+                    Log out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {connectionStatus.startsWith('Connected') ? (
+            <div className="connected-panel-wrap">
+              <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
+                <CheckCircle2 size={18} className="text-green-600" />
+                <span>Connected to <strong>{connectionRef.current?.peer || "Partner"}</strong></span>
+              </div>
+              <button onClick={() => { if (connection) connection.close(); }} className="leave-btn" title="Leave Call">
+                <PhoneOff size={16} />
+                Leave Call
+              </button>
+            </div>
+          ) : (
             <>
-              <input 
-                type="text" 
+              <input
+                type="text"
+                placeholder="Partner's ID"
                 value={remotePeerId}
                 onChange={(e) => setRemotePeerId(e.target.value)}
-                placeholder="Partner's ID" 
-                className="border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-40"
+                className="friend-id-input"
+                style={{ textTransform: "uppercase", height: '36px' }}
               />
-              <button 
-                onClick={connectToPeer}
-                disabled={!remotePeerId.trim()}
-                className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50"
-              >
+              <button onClick={connectToPeer} disabled={!remotePeerId.trim()} className="connect-btn" style={{ whiteSpace: 'nowrap', height: '36px' }}>
+                <PhoneCall size={16} />
                 Connect
               </button>
             </>
           )}
-          <div className="flex items-center gap-2">
-            {connectionStatus.startsWith('Connected') && (
-              <div title={`Network Quality: ${networkQuality}`} className={`flex items-center justify-center w-5 h-5 rounded-full ${networkQuality === 'Poor' ? 'bg-red-100' : 'bg-green-100'}`}>
-                <svg viewBox="0 0 24 24" fill="currentColor" className={`w-3 h-3 ${networkQuality === 'Poor' ? 'text-red-500' : 'text-green-500'}`}>
-                  <path d="M12 21a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm-4.2-4.2a1 1 0 011.4-1.4 4 4 0 015.6 0 1 1 0 01-1.4 1.4 2 2 0 00-2.8 0zm-3-3a1 1 0 011.4-1.4 8 8 0 0111.3 0 1 1 0 01-1.4 1.4 6 6 0 00-8.5 0zm-3-3a1 1 0 011.4-1.4 12 12 0 0117 0 1 1 0 01-1.4 1.4 10 10 0 00-14.2 0z"/>
-                </svg>
-              </div>
-            )}
-            <div className={`w-2.5 h-2.5 rounded-full ${
-              connectionStatus.startsWith('Connected') ? 'bg-green-500' : 
-              connectionStatus === 'Connecting...' ? 'bg-yellow-500' : 'bg-red-500'
-            }`}></div>
-            <span className="text-sm font-medium text-gray-700">{connectionStatus}</span>
-          </div>
         </div>
       </div>
 
-      {/* Unified Player Area */}
-      <div className="w-full bg-black rounded-xl overflow-hidden shadow-2xl relative border border-gray-800">
-        <div className="aspect-video relative bg-black flex items-center justify-center">
-          <video 
-            ref={videoRef}
-            className="w-full h-full object-contain"
-            playsInline
-            onLoadedMetadata={handleVideoLoadedMetadata}
-            onTimeUpdate={handleTimeUpdate}
-            onPlay={handlePlayPauseEvent}
-            onPause={handlePlayPauseEvent}
-            onWaiting={handleWaiting}
-          />
-          {!isStreamer && !videoRef.current?.srcObject && (
-            <div className="absolute inset-0 flex items-center justify-center text-gray-400 font-medium">
-              Waiting for stream...
-            </div>
-          )}
-        </div>
-
-        {/* Custom Control Bar */}
-        <div className="bg-gray-900 text-white p-3 flex flex-col gap-2 relative z-10 border-t border-gray-800">
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400 font-mono w-10 text-right">{formatTime(currentTime)}</span>
-            <input 
-              type="range" 
-              min="0" 
-              max={duration || 100} // Fallback to 100 if duration is 0
-              value={currentTime || 0}
-              onMouseDown={() => setIsScrubbing(true)}
-              onTouchStart={() => setIsScrubbing(true)}
-              onMouseUp={() => setIsScrubbing(false)}
-              onTouchEnd={() => setIsScrubbing(false)}
-              onChange={handleSeek}
-              className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:h-2 transition-all"
+      {/* Main Player & Draggable Feeds */}
+      <div
+        ref={containerRef}
+        className={isFullscreen ? "video-shell is-fullscreen" : "video-shell"}
+      >
+        <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
+          <div
+            className="local-video-host"
+            style={{ width: "100%", height: "100%", backgroundColor: isDarkMode ? '#1a1a1a' : '#000', position: "relative" }}
+          >
+            {/* The actual video element managed by WebRTC logic */}
+            <video 
+              ref={videoRef}
+              playsInline
+              onClick={togglePlayPause}
+              onLoadedMetadata={handleVideoLoadedMetadata}
+              onTimeUpdate={handleTimeUpdate}
+              onPlay={handlePlayPauseEvent}
+              onPause={handlePlayPauseEvent}
+              onWaiting={handleWaiting}
+              style={{ width: "100%", height: "100%", objectFit: "contain", cursor: "pointer", display: videoUrlRef.current || (connectionStatus.startsWith('Connected') && !isStreamer) ? "block" : "none" }}
             />
-            <span className="text-xs text-gray-400 font-mono w-10">{formatTime(duration)}</span>
-          </div>
-          <div className="flex items-center justify-between mt-1 px-1">
-            <div className="flex items-center gap-4">
-              <button 
-                onClick={togglePlayPause}
-                className="text-white hover:text-blue-400 transition-colors flex items-center justify-center w-8 h-8"
+            {(!videoUrlRef.current && (!connectionStatus.startsWith('Connected') || (connectionStatus.startsWith('Connected') && isStreamer && !videoUrlRef.current))) && (
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  height: "100%",
+                  color: "#9ca3af",
+                  flexDirection: "column",
+                  gap: "0.5rem",
+                  position: "absolute",
+                  inset: 0
+                }}
               >
-                {isPaused ? (
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                )}
-              </button>
-              
-              <div className="text-xs text-gray-400 font-medium bg-gray-800 px-2 py-1 rounded">
-                Role: {isStreamer ? <span className="text-green-400">Streamer</span> : <span className="text-blue-400">Viewer</span>}
+                <FolderOpen size={48} />
+                <p>Please select a local video file above or connect to a partner.</p>
+              </div>
+            )}
+
+            {/* Original WebRTCWatchParty Control Bar, Overlaying the Video */}
+            <div 
+              className="player-controls-overlay" 
+              onClick={(e) => e.stopPropagation()}
+              style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', padding: '1rem', boxSizing: 'border-box', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50, pointerEvents: 'auto' }}
+            >
+              <div className="flex items-center gap-2 w-full">
+                <span className="text-xs text-gray-200 font-mono w-10 text-right">{formatTime(currentTime)}</span>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max={duration || 100}
+                  value={currentTime || 0}
+                  onMouseDown={() => setIsScrubbing(true)}
+                  onTouchStart={() => setIsScrubbing(true)}
+                  onMouseUp={() => setIsScrubbing(false)}
+                  onTouchEnd={() => setIsScrubbing(false)}
+                  onChange={handleSeek}
+                  style={{
+                    background: `linear-gradient(to right, #3b82f6 ${duration ? (currentTime / duration) * 100 : 0}%, #4b5563 ${duration ? (currentTime / duration) * 100 : 0}%)`
+                  }}
+                  className="flex-1 h-1.5 rounded-lg appearance-none cursor-pointer accent-blue-500 hover:h-2 transition-all"
+                />
+                <span className="text-xs text-gray-200 font-mono w-10">{formatTime(duration)}</span>
+              </div>
+              <div className="flex items-center justify-between mt-1 px-1 w-full">
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={togglePlayPause}
+                    className="text-white hover:text-blue-400 transition-colors flex items-center justify-center w-8 h-8"
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  >
+                    {isPaused ? (
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M8 5v14l11-7z"/></svg>
+                    ) : (
+                      <svg viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                    )}
+                  </button>
+                  
+                  <div className="text-xs text-gray-300 font-medium bg-gray-800/80 px-2 py-1 rounded">
+                    Role: {isStreamer ? <span className="text-green-400">Streamer</span> : <span className="text-blue-400">Viewer</span>}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  <button onClick={toggleFullscreen} className="text-gray-300 hover:text-white transition-colors" style={{ background: 'transparent', border: 'none', cursor: 'pointer', display: 'flex' }}>
+                    {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
+                  </button>
+                </div>
               </div>
             </div>
-
-            <div className="flex items-center">
-              <label className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-medium cursor-pointer transition-colors shadow-sm">
-                Upload Video
-                <input 
-                  type="file" 
-                  accept="video/mp4,video/webm" 
-                  onChange={handleFileChange} 
-                  className="hidden"
-                />
-              </label>
-            </div>
           </div>
+
+        </div>
+
+        {/* Floating / Column Cameras */}
+        <div className={isFullscreen ? "camera-column is-fullscreen" : "camera-column"}>
+          {/* User 1: Local Stream */}
+          <Draggable
+            bounds="parent"
+            nodeRef={user1Ref}
+            disabled={!isFullscreen}
+            position={isFullscreen ? cam1Pos : { x: 0, y: 0 }}
+            onDrag={(e, data) => setCam1Pos({ x: data.x, y: data.y })}
+          >
+            <div
+              ref={user1Ref}
+              className={`video-card video-card--self ${isFullscreen ? "is-fullscreen" : "is-inline"}`}
+            >
+              <div className="video-surface">
+                {/* Dummy Local Video Feed */}
+                <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden', backgroundColor: '#333' }} />
+                {!user1Media.cam && (
+                  <div className="waiting-overlay">
+                    <VideoOff className="waiting-icon" />
+                    <span className="waiting-text">Camera Off</span>
+                  </div>
+                )}
+                <div className="participant-tag-wrap" style={{ zIndex: 30 }}>
+                  <span className="participant-tag">You</span>
+                  <div className="local-volume-meter">
+                    <div className="local-volume-fill" style={{ height: user1Media.mic ? '50%' : '0%' }} />
+                  </div>
+                </div>
+              </div>
+              <div className="media-controls">
+                <button
+                  onClick={() => setUser1Media({ ...user1Media, mic: !user1Media.mic })}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className={`media-toggle-btn ${user1Media.mic ? "is-on" : "is-off"}`}
+                  title={user1Media.mic ? "Mute Microphone" : "Unmute Microphone"}
+                >
+                  {user1Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
+                </button>
+                <button
+                  onClick={() => setUser1Media({ ...user1Media, cam: !user1Media.cam })}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  className={`media-toggle-btn ${user1Media.cam ? "is-on" : "is-off"}`}
+                  title={user1Media.cam ? "Turn Off Camera" : "Turn On Camera"}
+                >
+                  {user1Media.cam ? <VideoIcon size={18} /> : <VideoOff size={18} />}
+                </button>
+              </div>
+            </div>
+          </Draggable>
+
+          {/* User 2: Friend Stream */}
+          <Draggable
+            bounds="parent"
+            nodeRef={user2Ref}
+            disabled={!isFullscreen}
+            position={isFullscreen ? cam2Pos : { x: 0, y: 0 }}
+            onDrag={(e, data) => setCam2Pos({ x: data.x, y: data.y })}
+          >
+            <div
+              ref={user2Ref}
+              className={`video-card video-card--friend ${isFullscreen ? "is-fullscreen" : "is-inline"}`}
+            >
+              <div className="video-surface video-surface--friend">
+                {/* Dummy Remote Video Feed */}
+                <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden', backgroundColor: '#222' }} />
+
+                {!connectionStatus.startsWith('Connected') && (
+                  <div className="waiting-overlay">
+                    <VideoOff className="waiting-icon" />
+                    <span className="waiting-text">Waiting for partner...</span>
+                  </div>
+                )}
+                {connectionStatus.startsWith('Connected') && !user2Media.cam && (
+                  <div className="waiting-overlay">
+                    <VideoOff className="waiting-icon" />
+                    <span className="waiting-text">Partner's camera is off</span>
+                  </div>
+                )}
+                <div className="participant-tag-wrap participant-tag-wrap--friend">
+                  <span className="participant-tag">Partner</span>
+                </div>
+              </div>
+              <div className="media-controls media-controls--friend">
+                <div
+                  className={`media-indicator-badge ${user2Media.mic ? "is-on" : "is-off"}`}
+                  title={user2Media.mic ? "Partner's Mic is On" : "Partner is Muted"}
+                >
+                  {user2Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
+                </div>
+                <div
+                  className={`media-indicator-badge ${user2Media.cam ? "is-on" : "is-off"}`}
+                  title={user2Media.cam ? "Partner's Camera is On" : "Partner's Camera is Off"}
+                >
+                  {user2Media.cam ? <VideoIcon size={18} /> : <VideoOff size={18} />}
+                </div>
+              </div>
+            </div>
+          </Draggable>
         </div>
       </div>
     </div>
