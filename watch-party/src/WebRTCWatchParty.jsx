@@ -165,15 +165,6 @@ export default function WebRTCWatchParty() {
       animationFrameId.current = null;
     }
     
-    if (mediaElementSourceRef.current) {
-      mediaElementSourceRef.current.disconnect();
-    }
-    
-    if (mediaStreamDestinationRef.current) {
-      mediaStreamDestinationRef.current.disconnect();
-      mediaStreamDestinationRef.current = null;
-    }
-
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
@@ -649,8 +640,30 @@ export default function WebRTCWatchParty() {
     }
 
     // Audio routing
-    if (originalAudioTrack) {
-      finalStream.addTrack(originalAudioTrack);
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      const audioCtx = audioContextRef.current;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      
+      // CRITICAL: Only create these nodes ONCE per <video> element
+      if (!mediaElementSourceRef.current) {
+        mediaElementSourceRef.current = audioCtx.createMediaElementSource(video);
+        mediaStreamDestinationRef.current = audioCtx.createMediaStreamDestination();
+        
+        mediaElementSourceRef.current.connect(mediaStreamDestinationRef.current);
+        // Connect to destination so the local streamer can still hear the movie
+        mediaElementSourceRef.current.connect(audioCtx.destination);
+      }
+      
+      if (mediaStreamDestinationRef.current.stream.getAudioTracks().length > 0) {
+        finalStream.addTrack(mediaStreamDestinationRef.current.stream.getAudioTracks()[0]);
+      }
+    } catch (e) {
+      console.warn("Web Audio API failed, falling back to captureStream track", e);
+      if (originalAudioTrack) finalStream.addTrack(originalAudioTrack);
     }
     
     if (!finalStream) return;
