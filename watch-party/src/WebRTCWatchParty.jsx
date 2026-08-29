@@ -74,18 +74,14 @@ export default function WebRTCWatchParty() {
   const mediaStreamDestinationRef = useRef(null);
   const statsIntervalRef = useRef(null);
   
-  const videoUrlRef = useRef(''); // Local object URL
+  const videoUrlRef = useRef('');
   const videoRef = useRef(null);
-  
-  // Throttle state for updates
   const lastSyncTime = useRef(0);
 
-  // Synchronize connection reference for callbacks
   useEffect(() => {
     connectionRef.current = connection;
   }, [connection]);
 
-  // Prevent stale closures in WebRTC callbacks
   const handleIncomingDataRef = useRef(null);
   useEffect(() => {
     handleIncomingDataRef.current = handleIncomingData;
@@ -124,12 +120,46 @@ export default function WebRTCWatchParty() {
     setNetworkQuality('Good');
   };
 
+  /**
+   * Enforces 1080p/4K bitrates and prevents WebRTC from degrading resolution.
+   */
+  const applyHighQualitySenderSettings = (peerConnection) => {
+    if (!peerConnection) return;
+    
+    setTimeout(() => {
+      try {
+        const senders = peerConnection.getSenders();
+        senders.forEach((sender) => {
+          if (sender.track && sender.track.kind === 'video') {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
+            }
+            
+            // Set max bitrate to 8 Mbps (8,000,000 bps) for high-definition streaming
+            params.encodings[0].maxBitrate = 8000000;
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
+            
+            // Critical: Never downscale the resolution, prioritize frame detail
+            params.degradationPreference = 'maintain-resolution';
+
+            sender.setParameters(params).catch((err) => {
+              console.warn('Unable to set RTCRtpSender parameters:', err);
+            });
+          }
+        });
+      } catch (err) {
+        console.warn('Sender optimization failed:', err);
+      }
+    }, 500);
+  };
+
   useEffect(() => {
     let isMounted = true;
 
     const initPeer = async () => {
       let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
-      
       const backendUrlStr = import.meta.env.VITE_BACKEND_URL || 'https://watch-party-74e5.onrender.com';
       
       try {
@@ -148,7 +178,6 @@ export default function WebRTCWatchParty() {
       if (!isMounted) return;
 
       const isDev = import.meta.env.DEV;
-      
       const peerOptions = {
         path: '/myapp',
         config: { iceServers }
@@ -171,7 +200,6 @@ export default function WebRTCWatchParty() {
         peerOptions.secure = true;
       }
 
-      // Generate a 6-character alphanumeric ID for the room
       const customId = Math.random().toString(36).substring(2, 8).toLowerCase();
       const peer = new Peer(customId, peerOptions);
       peerInstance.current = peer;
@@ -182,7 +210,6 @@ export default function WebRTCWatchParty() {
 
       peer.on('connection', (conn) => {
         if (!isMounted) return;
-        // Incoming data connection
         setConnectionStatus('Connecting...');
         
         conn.on('open', () => {
@@ -211,16 +238,13 @@ export default function WebRTCWatchParty() {
 
       peer.on('call', (call) => {
         if (!isMounted) return;
-        // Incoming media call
-        call.answer(); // Answer without local stream
+        call.answer();
 
         call.on('stream', (remoteStream) => {
-          // Double check we're not the streamer
           if (videoRef.current) {
             videoRef.current.removeAttribute('src');
             videoRef.current.srcObject = remoteStream;
             videoRef.current.play().catch(e => console.error("Autoplay blocked:", e));
-            
             startStatsMonitoring(call, false);
           }
         });
@@ -234,7 +258,6 @@ export default function WebRTCWatchParty() {
 
     initPeer();
 
-    // Cleanup on unmount
     return () => {
       isMounted = false;
       cleanupMediaAndCalls();
@@ -262,17 +285,13 @@ export default function WebRTCWatchParty() {
         videoRef.current.removeAttribute('src');
         videoRef.current.srcObject = null;
       }
-    }
-    else if (data.type === 'SYNC_STATE') {
-      // If we are not the streamer, and we are not currently scrubbing, update our UI state
+    } else if (data.type === 'SYNC_STATE') {
       if (!isStreamer && !isScrubbing && Date.now() > ignoreSyncUntil.current) {
         setCurrentTime(data.currentTime);
         setDuration(data.duration);
         setIsPaused(data.isPaused);
       }
-    }
-    else if (data.type === 'COMMAND') {
-      // If we ARE the streamer, execute the action on our local video
+    } else if (data.type === 'COMMAND') {
       if (isStreamer && videoRef.current) {
         const video = videoRef.current;
         if (data.action === 'play') {
@@ -325,7 +344,6 @@ export default function WebRTCWatchParty() {
       }
       const url = URL.createObjectURL(file);
       videoUrlRef.current = url;
-      
       setIsStreamer(true);
 
       if (videoRef.current) {
@@ -333,7 +351,6 @@ export default function WebRTCWatchParty() {
         videoRef.current.src = url;
       }
 
-      // Notify remote peer of takeover
       if (connectionRef.current && connectionRef.current.open) {
         connectionRef.current.send({ type: 'STREAM_TAKEOVER' });
       }
@@ -369,7 +386,7 @@ export default function WebRTCWatchParty() {
   };
 
   const handleVideoLoadedMetadata = () => {
-    if (!isStreamer) return; // Only streamer captures and sends stream
+    if (!isStreamer) return;
     const video = videoRef.current;
     if (!video) return;
 
@@ -383,7 +400,8 @@ export default function WebRTCWatchParty() {
     let originalAudioTrack = null;
     
     try {
-      const captured = video.captureStream ? video.captureStream() : (video.mozCaptureStream ? video.mozCaptureStream() : null);
+      // Capture the source video at full 60fps / native refresh rate
+      const captured = video.captureStream ? video.captureStream(60) : (video.mozCaptureStream ? video.mozCaptureStream(60) : null);
       if (captured && captured.getVideoTracks().length > 0) {
         capturedVideoTrack = captured.getVideoTracks()[0];
         if (captured.getAudioTracks().length > 0) {
@@ -393,37 +411,50 @@ export default function WebRTCWatchParty() {
         fallbackToCanvas = true;
       }
     } catch (e) {
-      console.warn("captureStream failed, falling back to canvas", e);
       fallbackToCanvas = true;
     }
 
     if (fallbackToCanvas) {
-      console.log("Using Canvas + Web Audio fallback");
       if (!canvasRef.current) {
         canvasRef.current = document.createElement('canvas');
       }
       const canvas = canvasRef.current;
-      canvas.width = video.videoWidth || 1280;
-      canvas.height = video.videoHeight || 720;
-      const ctx = canvas.getContext('2d');
+      canvas.width = video.videoWidth || 1920;
+      canvas.height = video.videoHeight || 1080;
+      const ctx = canvas.getContext('2d', { alpha: false, desynchronized: true });
 
-      const loop = () => {
+      const renderFrame = () => {
         if (!video.paused && !video.ended) {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         }
-        animationFrameId.current = requestAnimationFrame(loop);
+        if ('requestVideoFrameCallback' in video) {
+          video.requestVideoFrameCallback(renderFrame);
+        } else {
+          animationFrameId.current = requestAnimationFrame(renderFrame);
+        }
       };
-      animationFrameId.current = requestAnimationFrame(loop);
-      
-      const canvasStream = canvas.captureStream(30);
-      if (canvasStream.getVideoTracks().length > 0) {
-        finalStream.addTrack(canvasStream.getVideoTracks()[0]);
+
+      if ('requestVideoFrameCallback' in video) {
+        video.requestVideoFrameCallback(renderFrame);
+      } else {
+        animationFrameId.current = requestAnimationFrame(renderFrame);
       }
-    } else if (capturedVideoTrack) {
+      
+      const canvasStream = canvas.captureStream(60);
+      if (canvasStream.getVideoTracks().length > 0) {
+        capturedVideoTrack = canvasStream.getVideoTracks()[0];
+      }
+    }
+
+    // Tell WebRTC encoder to maintain crisp 1080p/4K resolution
+    if (capturedVideoTrack) {
+      if ('contentHint' in capturedVideoTrack) {
+        capturedVideoTrack.contentHint = 'detail';
+      }
       finalStream.addTrack(capturedVideoTrack);
     }
 
-    // ALWAYS use Web Audio Routing for reliable audio extraction (bypasses captureStream bugs)
+    // Audio routing
     try {
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       if (!audioContextRef.current) {
@@ -448,31 +479,35 @@ export default function WebRTCWatchParty() {
         finalStream.addTrack(destination.stream.getAudioTracks()[0]);
       }
     } catch (e) {
-      console.error("Web Audio fallback failed, attempting to use native audio track:", e);
       if (originalAudioTrack) {
         finalStream.addTrack(originalAudioTrack);
       }
     }
     
-    if (!finalStream) {
-      console.error('Failed to capture stream.');
-      return;
-    }
+    if (!finalStream) return;
 
     streamRef.current = finalStream;
 
     const call = peerInstance.current.call(connectionRef.current.peer, finalStream);
     mediaCallRef.current = call;
+    
+    // Elevate bitrate & quality parameters on the WebRTC connection
+    if (call.peerConnection) {
+      applyHighQualitySenderSettings(call.peerConnection);
+      call.peerConnection.addEventListener('connectionstatechange', () => {
+        if (call.peerConnection.connectionState === 'connected') {
+          applyHighQualitySenderSettings(call.peerConnection);
+        }
+      });
+    }
+
     startStatsMonitoring(call, true);
   };
 
-  // --- Synchronization Engine (Streamer Source of Truth) ---
   const sendSyncState = () => {
     if (!isStreamer || !videoRef.current) return;
     
     const video = videoRef.current;
-    
-    // Always update local UI state immediately, regardless of connection
     setCurrentTime(video.currentTime);
     setDuration(video.duration || 0);
     setIsPaused(video.paused);
@@ -480,7 +515,6 @@ export default function WebRTCWatchParty() {
     if (!connectionRef.current || !connectionRef.current.open) return;
 
     const now = Date.now();
-    // Throttle to 250ms to avoid flooding
     if (now - lastSyncTime.current < 250) return;
     lastSyncTime.current = now;
 
@@ -493,9 +527,7 @@ export default function WebRTCWatchParty() {
   };
 
   const handleTimeUpdate = () => {
-    if (isStreamer) {
-      sendSyncState();
-    }
+    if (isStreamer) sendSyncState();
   };
 
   const handlePlayPauseEvent = () => {
@@ -503,14 +535,12 @@ export default function WebRTCWatchParty() {
       const video = videoRef.current;
       if (!video) return;
 
-      // Update local state even if not connected
       setCurrentTime(video.currentTime);
       setDuration(video.duration || 0);
       setIsPaused(video.paused);
 
       if (!connectionRef.current || !connectionRef.current.open) return;
       
-      // Force sync bypass throttle
       connectionRef.current.send({
         type: 'SYNC_STATE',
         currentTime: video.currentTime,
@@ -522,12 +552,9 @@ export default function WebRTCWatchParty() {
   };
 
   const handleWaiting = () => {
-    if (isStreamer) {
-      sendSyncState();
-    }
+    if (isStreamer) sendSyncState();
   };
 
-  // --- Custom Control Handlers ---
   const togglePlayPause = () => {
     if (isStreamer) {
       const video = videoRef.current;
@@ -536,26 +563,22 @@ export default function WebRTCWatchParty() {
         else video.pause();
       }
     } else {
-      // Receiver sends command
       if (connectionRef.current && connectionRef.current.open) {
         connectionRef.current.send({ type: 'COMMAND', action: isPaused ? 'play' : 'pause' });
       }
-      // Optimistically update local UI
       setIsPaused(!isPaused);
     }
   };
 
   const handleSeek = (e) => {
     const newTime = parseFloat(e.target.value);
-    setCurrentTime(newTime); // Update locally while scrubbing
+    setCurrentTime(newTime);
 
     if (isStreamer) {
       if (videoRef.current) videoRef.current.currentTime = newTime;
       sendSyncState();
     } else {
-      // Suspend incoming sync updates for 500ms to prevent jitter
       ignoreSyncUntil.current = Date.now() + 500;
-      // Receiver sends command
       if (connectionRef.current && connectionRef.current.open) {
         connectionRef.current.send({ type: 'COMMAND', action: 'seek', value: newTime });
       }
@@ -627,8 +650,6 @@ export default function WebRTCWatchParty() {
       `}</style>
 
       <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
-        
-        {/* Left: Buttons, Upload & File Names */}
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
           <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
             <button className="btn-join" onClick={() => navigate('/party')}>
@@ -676,26 +697,18 @@ export default function WebRTCWatchParty() {
           </div>
         </div>
 
-        {/* Middle: Room ID */}
         <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
           <span className="room-id-label" style={{ whiteSpace: 'nowrap' }}>
             {connectionStatus.startsWith('Connected') ? "Active Room ID:" : "Your Room ID:"}
           </span>
           <code className="room-id-code">{peerId || "Generating..."}</code>
-          <button
-            onClick={copyToClipboard}
-            className="copy-id-btn"
-            title="Copy Room ID"
-          >
+          <button onClick={copyToClipboard} className="copy-id-btn" title="Copy Room ID">
             <Copy size={16} />
           </button>
         </div>
 
-        {/* Right: Friend Connect (with absolute positioned Profile & Theme Toggle above) */}
         <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative' }}>
-          
           <div style={{ position: 'absolute', top: '-60px', right: '0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
-            {/* Theme Toggle Switch */}
             <div 
               onClick={() => setIsDarkMode(!isDarkMode)}
               style={{
@@ -716,7 +729,6 @@ export default function WebRTCWatchParty() {
               </div>
             </div>
 
-            {/* Profile Dropdown */}
             <div ref={profileDropdownRef} style={{ position: 'relative' }}>
               <button 
                 onClick={() => setShowProfile(!showProfile)}
@@ -789,7 +801,6 @@ export default function WebRTCWatchParty() {
         </div>
       </div>
 
-      {/* Main Player & Draggable Feeds */}
       <div
         ref={containerRef}
         className={isFullscreen ? "video-shell is-fullscreen" : "video-shell"}
@@ -799,7 +810,6 @@ export default function WebRTCWatchParty() {
             className="local-video-host"
             style={{ width: "100%", height: "100%", backgroundColor: isDarkMode ? '#1a1a1a' : '#000', position: "relative" }}
           >
-            {/* The actual video element managed by WebRTC logic */}
             <video 
               ref={videoRef}
               playsInline
@@ -830,7 +840,6 @@ export default function WebRTCWatchParty() {
               </div>
             )}
 
-            {/* Original WebRTCWatchParty Control Bar, Overlaying the Video */}
             <div 
               className="player-controls-overlay" 
               onClick={(e) => e.stopPropagation()}
@@ -882,12 +891,9 @@ export default function WebRTCWatchParty() {
               </div>
             </div>
           </div>
-
         </div>
 
-        {/* Floating / Column Cameras */}
         <div className={isFullscreen ? "camera-column is-fullscreen" : "camera-column"}>
-          {/* User 1: Local Stream */}
           <Draggable
             bounds="parent"
             nodeRef={user1Ref}
@@ -900,7 +906,6 @@ export default function WebRTCWatchParty() {
               className={`video-card video-card--self ${isFullscreen ? "is-fullscreen" : "is-inline"}`}
             >
               <div className="video-surface">
-                {/* Dummy Local Video Feed */}
                 <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden', backgroundColor: '#333' }} />
                 {!user1Media.cam && (
                   <div className="waiting-overlay">
@@ -936,7 +941,6 @@ export default function WebRTCWatchParty() {
             </div>
           </Draggable>
 
-          {/* User 2: Friend Stream */}
           <Draggable
             bounds="parent"
             nodeRef={user2Ref}
@@ -949,7 +953,6 @@ export default function WebRTCWatchParty() {
               className={`video-card video-card--friend ${isFullscreen ? "is-fullscreen" : "is-inline"}`}
             >
               <div className="video-surface video-surface--friend">
-                {/* Dummy Remote Video Feed */}
                 <div style={{ width: '100%', height: '100%', display: 'flex', overflow: 'hidden', backgroundColor: '#222' }} />
 
                 {!connectionStatus.startsWith('Connected') && (
