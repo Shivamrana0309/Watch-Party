@@ -58,6 +58,26 @@ export default function WebRTCWatchParty() {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [networkQuality, setNetworkQuality] = useState('Good');
   
+  const [controlsVisible, setControlsVisible] = useState(true);
+  const controlsTimeoutRef = useRef(null);
+
+  const handleMouseMove = () => {
+    setControlsVisible(true);
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    controlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 5000);
+  };
+  
+  const handleMouseLeave = () => {
+    if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    setControlsVisible(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    };
+  }, []);
+
   const ignoreSyncUntil = useRef(0);
 
   // Refs
@@ -827,7 +847,9 @@ export default function WebRTCWatchParty() {
         <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
           <div
             className="local-video-host"
-            style={{ width: "100%", height: isFullscreen ? "100%" : "auto", aspectRatio: isFullscreen ? "auto" : "16 / 9", backgroundColor: isDarkMode ? '#1a1a1a' : '#000', position: "relative" }}
+            onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
+            style={{ width: "100%", height: isFullscreen ? "100%" : "auto", aspectRatio: isFullscreen ? "auto" : "16 / 9", backgroundColor: isDarkMode ? '#1a1a1a' : '#000', position: "relative", cursor: controlsVisible ? "default" : "none" }}
           >
             <video 
               ref={videoRef}
@@ -838,7 +860,7 @@ export default function WebRTCWatchParty() {
               onPlay={handlePlayPauseEvent}
               onPause={handlePlayPauseEvent}
               onWaiting={handleWaiting}
-              style={{ width: "100%", height: "100%", objectFit: "contain", cursor: "pointer", display: videoUrlRef.current || (connectionStatus.startsWith('Connected') && !isStreamer) ? "block" : "none" }}
+              style={{ width: "100%", height: "100%", objectFit: "contain", cursor: controlsVisible ? "pointer" : "none", display: videoUrlRef.current || (connectionStatus.startsWith('Connected') && !isStreamer) ? "block" : "none" }}
             />
             {(!videoUrlRef.current && (!connectionStatus.startsWith('Connected') || (connectionStatus.startsWith('Connected') && isStreamer && !videoUrlRef.current))) && (
               <div
@@ -862,7 +884,14 @@ export default function WebRTCWatchParty() {
             <div 
               className="player-controls-overlay" 
               onClick={(e) => e.stopPropagation()}
-              style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', padding: '1rem', boxSizing: 'border-box', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50, pointerEvents: 'auto' }}
+              style={{ 
+                display: 'flex', flexDirection: 'column', gap: '0.5rem', 
+                background: 'linear-gradient(to top, rgba(0,0,0,0.9), transparent)', 
+                padding: '1rem', boxSizing: 'border-box', position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 50,
+                opacity: controlsVisible ? 1 : 0,
+                pointerEvents: controlsVisible ? 'auto' : 'none',
+                transition: 'opacity 0.3s ease'
+              }}
             >
               <div className="flex items-center gap-2 w-full">
                 <span className="text-xs text-gray-200 font-mono w-10 text-right">{formatTime(currentTime)}</span>
