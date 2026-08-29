@@ -649,33 +649,8 @@ export default function WebRTCWatchParty() {
     }
 
     // Audio routing
-    try {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-      }
-      const audioCtx = audioContextRef.current;
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-      
-      if (!mediaElementSourceRef.current) {
-        mediaElementSourceRef.current = audioCtx.createMediaElementSource(video);
-      }
-      
-      mediaElementSourceRef.current.disconnect();
-      
-      const destination = audioCtx.createMediaStreamDestination();
-      mediaStreamDestinationRef.current = destination;
-      
-      mediaElementSourceRef.current.connect(destination);
-      mediaElementSourceRef.current.connect(audioCtx.destination);
-      
-      if (destination.stream.getAudioTracks().length > 0) {
-        finalStream.addTrack(destination.stream.getAudioTracks()[0]);
-      }
-    } catch (e) {
-      if (originalAudioTrack) {
-        finalStream.addTrack(originalAudioTrack);
-      }
+    if (originalAudioTrack) {
+      finalStream.addTrack(originalAudioTrack);
     }
     
     if (!finalStream) return;
