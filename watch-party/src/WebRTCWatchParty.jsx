@@ -17,7 +17,7 @@ const applyBandwidthOptimizations = (call, type) => {
     senders.forEach((sender) => {
       if (!sender.track) return;
       const params = sender.getParameters();
-      if (!params.encodings) params.encodings = [{}];
+      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
 
       if (type === 'webcam') {
         if (sender.track.kind === 'video') {
@@ -59,7 +59,12 @@ export default function WebRTCWatchParty() {
   const [cam1Pos, setCam1Pos] = useState({ x: 0, y: 0 });
   const [cam2Pos, setCam2Pos] = useState({ x: 0, y: 0 });
   const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
+  const user1MediaRef = useRef(user1Media);
   const [user2Media, setUser2Media] = useState({ mic: false, cam: false });
+
+  useEffect(() => {
+    user1MediaRef.current = user1Media;
+  }, [user1Media]);
   const [isFullscreen, setIsFullscreen] = useState(false);
   
   const containerRef = useRef(null);
@@ -324,15 +329,16 @@ export default function WebRTCWatchParty() {
         if (!isMounted) return;
 
         if (call.metadata && call.metadata.type === 'WEBCAM') {
+          console.log("Receiving WEBCAM call. Answering with local stream:", !!localCamStreamRef.current);
           call.answer(localCamStreamRef.current);
-          applyBandwidthOptimizations(call, 'webcam');
+          // applyBandwidthOptimizations(call, 'webcam'); // REMOVED: Modifying senders on the answerer can cause tracks to drop in some browsers
           camCallRef.current = call;
           call.on('stream', (remoteStream) => {
-            if (isMounted) {
-              setRemoteCamStream(remoteStream);
-              if (remoteVideoCamRef.current) {
-                remoteVideoCamRef.current.srcObject = remoteStream;
-              }
+            console.log("Answerer received remote WEBCAM stream:", remoteStream);
+            setRemoteCamStream(remoteStream);
+            if (remoteVideoCamRef.current) {
+              remoteVideoCamRef.current.srcObject = remoteStream;
+              remoteVideoCamRef.current.play().catch(e => console.error("Webcam autoplay blocked:", e));
             }
           });
         } else {
@@ -454,20 +460,24 @@ export default function WebRTCWatchParty() {
         setIsCalling(false);
         setConnectionStatus(`Connected to ${conn.peer}`);
         setConnection(conn);
+        conn.send({ type: 'MEDIA_STATE', ...user1MediaRef.current });
 
         // Initiate WEBCAM call to the peer
         if (localCamStreamRef.current) {
+          console.log("Caller initiating WEBCAM call to", conn.peer);
           const camCall = peerInstance.current.call(conn.peer, localCamStreamRef.current, { metadata: { type: 'WEBCAM' } });
           applyBandwidthOptimizations(camCall, 'webcam');
           camCallRef.current = camCall;
           camCall.on('stream', (remoteStream) => {
-            if (isMounted) {
-              setRemoteCamStream(remoteStream);
-              if (remoteVideoCamRef.current) {
-                remoteVideoCamRef.current.srcObject = remoteStream;
-              }
+            console.log("Caller received remote WEBCAM stream:", remoteStream);
+            setRemoteCamStream(remoteStream);
+            if (remoteVideoCamRef.current) {
+              remoteVideoCamRef.current.srcObject = remoteStream;
+              remoteVideoCamRef.current.play().catch(e => console.error("Webcam autoplay blocked:", e));
             }
           });
+        } else {
+          console.warn("Caller has no local webcam stream to initiate the call with.");
         }
         
       } else if (data.type === 'CALL_REJECTED') {
@@ -498,6 +508,7 @@ export default function WebRTCWatchParty() {
     setConnection(incomingCall);
     setConnectionStatus(`Connected to ${incomingCall.peer}`);
     incomingCall.send({ type: 'CALL_ACCEPTED' });
+    incomingCall.send({ type: 'MEDIA_STATE', ...user1MediaRef.current });
     setIncomingCall(null);
   };
 
