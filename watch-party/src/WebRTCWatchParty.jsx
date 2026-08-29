@@ -331,15 +331,20 @@ export default function WebRTCWatchParty() {
 
     if (!peerInstance.current || !connectionRef.current) return;
 
-    let finalStream;
+    let finalStream = new MediaStream();
     let fallbackToCanvas = false;
+    let capturedVideoTrack = null;
+    let originalAudioTrack = null;
     
     try {
       const captured = video.captureStream ? video.captureStream() : (video.mozCaptureStream ? video.mozCaptureStream() : null);
-      if (!captured || captured.getVideoTracks().length === 0) {
-        fallbackToCanvas = true;
+      if (captured && captured.getVideoTracks().length > 0) {
+        capturedVideoTrack = captured.getVideoTracks()[0];
+        if (captured.getAudioTracks().length > 0) {
+          originalAudioTrack = captured.getAudioTracks()[0];
+        }
       } else {
-        finalStream = captured;
+        fallbackToCanvas = true;
       }
     } catch (e) {
       console.warn("captureStream failed, falling back to canvas", e);
@@ -364,34 +369,42 @@ export default function WebRTCWatchParty() {
       };
       animationFrameId.current = requestAnimationFrame(loop);
       
-      finalStream = canvas.captureStream(30);
+      const canvasStream = canvas.captureStream(30);
+      if (canvasStream.getVideoTracks().length > 0) {
+        finalStream.addTrack(canvasStream.getVideoTracks()[0]);
+      }
+    } else if (capturedVideoTrack) {
+      finalStream.addTrack(capturedVideoTrack);
+    }
 
-      // Web Audio Routing
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!audioContextRef.current) {
-          audioContextRef.current = new AudioContext();
-        }
-        const audioCtx = audioContextRef.current;
-        if (audioCtx.state === 'suspended') audioCtx.resume();
-        
-        if (!mediaElementSourceRef.current) {
-          mediaElementSourceRef.current = audioCtx.createMediaElementSource(video);
-        }
-        
-        mediaElementSourceRef.current.disconnect();
-        
-        const destination = audioCtx.createMediaStreamDestination();
-        mediaStreamDestinationRef.current = destination;
-        
-        mediaElementSourceRef.current.connect(destination);
-        mediaElementSourceRef.current.connect(audioCtx.destination);
-        
-        if (destination.stream.getAudioTracks().length > 0) {
-          finalStream.addTrack(destination.stream.getAudioTracks()[0]);
-        }
-      } catch (e) {
-        console.error("Web Audio fallback failed:", e);
+    // ALWAYS use Web Audio Routing for reliable audio extraction (bypasses captureStream bugs)
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      const audioCtx = audioContextRef.current;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      
+      if (!mediaElementSourceRef.current) {
+        mediaElementSourceRef.current = audioCtx.createMediaElementSource(video);
+      }
+      
+      mediaElementSourceRef.current.disconnect();
+      
+      const destination = audioCtx.createMediaStreamDestination();
+      mediaStreamDestinationRef.current = destination;
+      
+      mediaElementSourceRef.current.connect(destination);
+      mediaElementSourceRef.current.connect(audioCtx.destination);
+      
+      if (destination.stream.getAudioTracks().length > 0) {
+        finalStream.addTrack(destination.stream.getAudioTracks()[0]);
+      }
+    } catch (e) {
+      console.error("Web Audio fallback failed, attempting to use native audio track:", e);
+      if (originalAudioTrack) {
+        finalStream.addTrack(originalAudioTrack);
       }
     }
     
