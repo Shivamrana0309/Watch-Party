@@ -55,9 +55,13 @@ export const CallProvider = ({ children }) => {
   const [incomingCall, setIncomingCall] = useState(null);
   const [callStatus, setCallStatus] = useState("");
 
+  const [localMovieStream, setLocalMovieStream] = useState(null);
+  const [remoteMovieStream, setRemoteMovieStream] = useState(null);
+
   const peerInstance = useRef(null);
   const currentCallRef = useRef(null);
   const screenCallRef = useRef(null);
+  const movieCallRef = useRef(null);
   const dataConnRef = useRef(null);
   const user1MediaRef = useRef(user1Media);
   const dataListeners = useRef(new Set());
@@ -70,6 +74,7 @@ export const CallProvider = ({ children }) => {
     localVideoDOM.current.autoPlay = true;
     localVideoDOM.current.playsInline = true;
     localVideoDOM.current.muted = true;
+    localVideoDOM.current.style.transform = "scaleX(-1)";
 
     remoteVideoDOM.current.autoPlay = true;
     remoteVideoDOM.current.playsInline = true;
@@ -166,6 +171,11 @@ export const CallProvider = ({ children }) => {
             call.on("stream", (screenStream) => {
               if (isMounted) setRemoteScreenStream(screenStream);
             });
+          } else if (call.metadata && call.metadata.type === "MOVIE_SHARE") {
+            call.answer();
+            call.on("stream", (movieStream) => {
+              if (isMounted) setRemoteMovieStream(movieStream);
+            });
           } else {
             if (!myStream) return;
             currentCallRef.current = call;
@@ -192,6 +202,8 @@ export const CallProvider = ({ children }) => {
         setUser2Media({ mic: data.mic, cam: data.cam });
       } else if (data.type === "SCREEN_SHARE_STOPPED") {
         setRemoteScreenStream(null);
+      } else if (data.type === "MOVIE_SHARE_STOPPED") {
+        setRemoteMovieStream(null);
       } else if (data.type === "CALL_REJECTED") {
         leaveCall();
         setCallStatus("Call was rejected.");
@@ -434,6 +446,35 @@ export const CallProvider = ({ children }) => {
     }
   };
 
+  const startMovieShare = (videoStream) => {
+    setLocalMovieStream(videoStream);
+
+    if (isConnected && activeRoomId && peerInstance.current) {
+      try {
+        const call = peerInstance.current.call(activeRoomId, videoStream, {
+          metadata: { type: "MOVIE_SHARE" },
+        });
+        movieCallRef.current = call;
+      } catch (err) {
+        console.error("Failed to start movie share call:", err);
+      }
+    }
+  };
+
+  const stopMovieShare = () => {
+    if (localMovieStream) {
+      localMovieStream.getTracks().forEach((t) => t.stop());
+      setLocalMovieStream(null);
+    }
+    if (movieCallRef.current) {
+      movieCallRef.current.close();
+      movieCallRef.current = null;
+    }
+    if (dataConnRef.current && dataConnRef.current.open) {
+      dataConnRef.current.send({ type: "MOVIE_SHARE_STOPPED" });
+    }
+  };
+
   const leaveCall = () => {
     if (dataConnRef.current && dataConnRef.current.open) {
       try { dataConnRef.current.send({ type: "CALL_LEAVE" }); } catch {}
@@ -442,12 +483,21 @@ export const CallProvider = ({ children }) => {
     }
     if (currentCallRef.current) currentCallRef.current.close();
     if (screenCallRef.current) screenCallRef.current.close();
+    if (movieCallRef.current) {
+      movieCallRef.current.close();
+      movieCallRef.current = null;
+    }
 
     setRemoteStream(null);
     setRemoteScreenStream(null);
+    setRemoteMovieStream(null);
     if (localScreenStream) {
       localScreenStream.getTracks().forEach(t => t.stop());
       setLocalScreenStream(null);
+    }
+    if (localMovieStream) {
+      localMovieStream.getTracks().forEach(t => t.stop());
+      setLocalMovieStream(null);
     }
 
     setIsConnected(false);
@@ -496,6 +546,8 @@ export const CallProvider = ({ children }) => {
     remoteStream,
     localScreenStream,
     remoteScreenStream,
+    localMovieStream,
+    remoteMovieStream,
     peerId,
     friendId,
     setFriendId,
@@ -504,6 +556,8 @@ export const CallProvider = ({ children }) => {
     toggleLocalMic,
     toggleLocalCam,
     toggleScreenShare,
+    startMovieShare,
+    stopMovieShare,
     callFriend,
     acceptCall,
     rejectCall,

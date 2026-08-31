@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Peer from 'peerjs';
 import Draggable from 'react-draggable';
 import {
   Maximize, Minimize, Mic, MicOff, Video as VideoIcon, VideoOff,
@@ -7,50 +6,23 @@ import {
   User, Sun, Moon, Globe
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-
-const applyBandwidthOptimizations = (call, type) => {
-  if (!call || !call.peerConnection) return;
-  const pc = call.peerConnection;
-
-  const applyParams = () => {
-    const senders = pc.getSenders();
-    senders.forEach((sender) => {
-      if (!sender.track) return;
-      const params = sender.getParameters();
-      if (!params.encodings || params.encodings.length === 0) params.encodings = [{}];
-
-      if (type === 'webcam') {
-        if (sender.track.kind === 'video') {
-          params.encodings[0].maxBitrate = 200000;
-          params.encodings[0].networkPriority = 'low';
-        } else if (sender.track.kind === 'audio') {
-          params.encodings[0].networkPriority = 'high';
-        }
-      }
-      try {
-        sender.setParameters(params);
-      } catch (e) {
-        console.warn("Could not set RTCRtpSender parameters", e);
-      }
-    });
-  };
-
-  if (pc.connectionState === 'connected') {
-    applyParams();
-  } else {
-    pc.addEventListener('connectionstatechange', () => {
-      if (pc.connectionState === 'connected') applyParams();
-    });
-  }
-};
+import { useCallContext } from './context/CallContext';
 
 export default function WebRTCWatchParty() {
   const navigate = useNavigate();
-  const [peerId, setPeerId] = useState('');
-  const [remotePeerId, setRemotePeerId] = useState('');
-  const [connection, setConnection] = useState(null);
-  const [connectionStatus, setConnectionStatus] = useState('Disconnected');
-  
+
+  // ── Pull everything from the global CallContext ──
+  const {
+    peerId, friendId, setFriendId,
+    localStream, remoteStream,
+    remoteMovieStream, startMovieShare, stopMovieShare,
+    callFriend, acceptCall, rejectCall, leaveCall,
+    isConnected, callStatus, incomingCall,
+    user1Media, user2Media, toggleLocalMic, toggleLocalCam,
+    sendData, subscribeToData,
+    localVideoDOM, remoteVideoDOM
+  } = useCallContext();
+
   // UI & Player State
   const [fileName, setFileName] = useState("");
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
@@ -58,20 +30,15 @@ export default function WebRTCWatchParty() {
   const [userInfo] = useState({ name: 'Guest User', username: '@guest' });
   const [cam1Pos, setCam1Pos] = useState({ x: 0, y: 0 });
   const [cam2Pos, setCam2Pos] = useState({ x: 0, y: 0 });
-  const [user1Media, setUser1Media] = useState({ mic: true, cam: true });
-  const user1MediaRef = useRef(user1Media);
-  const [user2Media, setUser2Media] = useState({ mic: false, cam: false });
 
-  useEffect(() => {
-    user1MediaRef.current = user1Media;
-  }, [user1Media]);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  
+
   const containerRef = useRef(null);
   const user1Ref = useRef(null);
   const user2Ref = useRef(null);
   const profileDropdownRef = useRef(null);
 
+  // Theme persistence
   useEffect(() => {
     if (isDarkMode) {
       document.body.classList.add("dark-mode");
@@ -82,6 +49,7 @@ export default function WebRTCWatchParty() {
     }
   }, [isDarkMode]);
 
+  // Close profile dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (profileDropdownRef.current && !profileDropdownRef.current.contains(event.target)) {
@@ -98,15 +66,7 @@ export default function WebRTCWatchParty() {
   const [isPaused, setIsPaused] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [networkQuality, setNetworkQuality] = useState('Good');
-  
-  const [incomingCall, setIncomingCall] = useState(null);
-  const [isCalling, setIsCalling] = useState(false);
-  
-  // Webcam State
-  const [localCamStream, setLocalCamStream] = useState(null);
-  const [remoteCamStream, setRemoteCamStream] = useState(null);
-  const localCamStreamRef = useRef(null);
-  
+
   const [controlsVisible, setControlsVisible] = useState(true);
   const controlsTimeoutRef = useRef(null);
 
@@ -115,7 +75,7 @@ export default function WebRTCWatchParty() {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     controlsTimeoutRef.current = setTimeout(() => setControlsVisible(false), 5000);
   };
-  
+
   const handleMouseLeave = () => {
     if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
     setControlsVisible(false);
@@ -129,397 +89,153 @@ export default function WebRTCWatchParty() {
 
   const ignoreSyncUntil = useRef(0);
 
-  // Refs
-  const peerInstance = useRef(null);
-  const mediaCallRef = useRef(null);
-  const camCallRef = useRef(null);
-  const connectionRef = useRef(null);
+  // Local-only refs for movie streaming pipeline (canvas fallback, audio routing, stats)
   const streamRef = useRef(null);
-  const localVideoCamRef = useRef(null);
-  const remoteVideoCamRef = useRef(null);
-  
-  // Fallback Refs
   const canvasRef = useRef(null);
   const animationFrameId = useRef(null);
   const audioContextRef = useRef(null);
   const mediaElementSourceRef = useRef(null);
   const mediaStreamDestinationRef = useRef(null);
   const statsIntervalRef = useRef(null);
-  
+
   const videoUrlRef = useRef('');
   const videoRef = useRef(null);
   const lastSyncTime = useRef(0);
 
-  useEffect(() => {
-    connectionRef.current = connection;
-  }, [connection]);
+  // Webcam video element refs — these attach to context streams
+  const localVideoCamRef = useRef(null);
+  const remoteVideoCamRef = useRef(null);
+  const volumeBarRef = useRef(null);
 
-  const handleIncomingDataRef = useRef(null);
+  // ── Attach context webcam streams to local video elements ──
   useEffect(() => {
-    handleIncomingDataRef.current = handleIncomingData;
-  });
+    if (localVideoCamRef.current && localStream) {
+      localVideoCamRef.current.srcObject = localStream;
+      localVideoCamRef.current.play().catch(() => {});
+    }
+  }, [localStream]);
 
+  useEffect(() => {
+    if (remoteVideoCamRef.current && remoteStream) {
+      remoteVideoCamRef.current.srcObject = remoteStream;
+      remoteVideoCamRef.current.play().catch(() => {});
+    }
+  }, [remoteStream]);
+
+  // Volume Bar Logic
+  useEffect(() => {
+    let audioContext, analyser, source, animationFrameId;
+    if (localStream && user1Media.mic) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioContext = new AudioContext();
+      analyser = audioContext.createAnalyser();
+      analyser.smoothingTimeConstant = 0.7;
+      analyser.fftSize = 256;
+
+      source = audioContext.createMediaStreamSource(localStream);
+      source.connect(analyser);
+
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+      const updateVolume = () => {
+        analyser.getByteFrequencyData(dataArray);
+        let sum = 0;
+        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
+        const average = sum / dataArray.length;
+        if (volumeBarRef.current) volumeBarRef.current.style.height = `${Math.min(average * 1.5, 100)}%`;
+        animationFrameId = requestAnimationFrame(updateVolume);
+      };
+      updateVolume();
+    } else if (volumeBarRef.current) {
+      volumeBarRef.current.style.height = "0%";
+    }
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      if (audioContext && audioContext.state !== "closed") audioContext.close();
+    };
+  }, [localStream, user1Media.mic]);
+
+  // ── Attach remote movie stream to the main video player ──
+  useEffect(() => {
+    if (remoteMovieStream && videoRef.current && !isStreamer) {
+      videoRef.current.removeAttribute('src');
+      videoRef.current.srcObject = remoteMovieStream;
+      videoRef.current.play().catch(e => console.error("Autoplay blocked:", e));
+    }
+  }, [remoteMovieStream, isStreamer]);
+
+  // ── Clean up local movie capture resources ──
   const cleanupMediaAndCalls = () => {
     if (animationFrameId.current) {
       cancelAnimationFrame(animationFrameId.current);
       animationFrameId.current = null;
     }
-    
+
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(t => t.stop());
       streamRef.current = null;
     }
 
-    if (mediaCallRef.current) {
-      mediaCallRef.current.close();
-      mediaCallRef.current = null;
-    }
-    
     if (statsIntervalRef.current) {
       clearInterval(statsIntervalRef.current);
       statsIntervalRef.current = null;
     }
-    
+
     setNetworkQuality('Good');
   };
 
-  /**
-   * Enforces 1080p/4K bitrates and prevents WebRTC from degrading resolution.
-   */
-  const applyHighQualitySenderSettings = (peerConnection) => {
-    if (!peerConnection) return;
-    
-    setTimeout(() => {
-      try {
-        const senders = peerConnection.getSenders();
-        senders.forEach((sender) => {
-          if (sender.track && sender.track.kind === 'video') {
-            const params = sender.getParameters();
-            if (!params.encodings || params.encodings.length === 0) {
-              params.encodings = [{}];
-            }
-            
-            // Set max bitrate to 8 Mbps (8,000,000 bps) for high-definition streaming
-            params.encodings[0].maxBitrate = 8000000;
-            params.encodings[0].priority = 'high';
-            params.encodings[0].networkPriority = 'high';
-            
-            // Critical: Never downscale the resolution, prioritize frame detail
-            params.degradationPreference = 'maintain-resolution';
-
-            sender.setParameters(params).catch((err) => {
-              console.warn('Unable to set RTCRtpSender parameters:', err);
-            });
-          }
-        });
-      } catch (err) {
-        console.warn('Sender optimization failed:', err);
-      }
-    }, 500);
-  };
-
+  // Cleanup on unmount
   useEffect(() => {
-    let isMounted = true;
-
-    const initPeer = async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
-          audio: true,
-        });
-        if (!isMounted) {
-          stream.getTracks().forEach((track) => track.stop());
-          return;
-        }
-        setLocalCamStream(stream);
-        localCamStreamRef.current = stream;
-        if (localVideoCamRef.current) {
-          localVideoCamRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.warn("Could not access webcam/mic", err);
-      }
-
-      let iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
-      const backendUrlStr = import.meta.env.VITE_BACKEND_URL || 'https://watch-party-74e5.onrender.com';
-      
-      try {
-        const fetchUrl = backendUrlStr ? `${backendUrlStr}/api/turn-credentials` : '/api/turn-credentials';
-        const response = await fetch(fetchUrl);
-        if (response.ok) {
-          const data = await response.json();
-          if (data.iceServers) {
-            iceServers = data.iceServers;
-          }
-        }
-      } catch (err) {
-        console.warn('Failed to fetch TURN credentials, falling back to public STUN.', err);
-      }
-
-      if (!isMounted) return;
-
-      const isDev = import.meta.env.DEV;
-      const peerOptions = {
-        path: '/myapp',
-        config: { iceServers }
-      };
-
-      if (isDev) {
-        peerOptions.host = 'localhost';
-        peerOptions.port = 9000;
-        peerOptions.secure = false;
-      } else {
-        if (backendUrlStr) {
-          try {
-            const url = new URL(backendUrlStr);
-            peerOptions.host = url.hostname;
-          } catch(e) {}
-        } else {
-          peerOptions.host = window.location.hostname;
-        }
-        peerOptions.port = 443;
-        peerOptions.secure = true;
-      }
-
-      const customId = Math.random().toString(36).substring(2, 8).toUpperCase();
-      const peer = new Peer(customId, peerOptions);
-      peerInstance.current = peer;
-
-      peer.on('open', (id) => {
-        if (isMounted) setPeerId(id);
-      });
-
-      peer.on('connection', (conn) => {
-        if (!isMounted) return;
-        
-        setIncomingCall(conn);
-        setConnectionStatus(`Incoming call from ${conn.peer}`);
-
-        conn.on('data', (data) => {
-          if (handleIncomingDataRef.current) handleIncomingDataRef.current(data);
-        });
-
-        conn.on('close', () => {
-          if (isMounted) {
-             setConnectionStatus('Disconnected');
-             setConnection(null);
-             setIncomingCall((currentCall) => {
-               if (currentCall && currentCall.peer === conn.peer) return null;
-               return currentCall;
-             });
-          }
-        });
-        
-        conn.on('error', (err) => {
-          console.error('Connection error:', err);
-          if (isMounted) setConnectionStatus('Error');
-        });
-      });
-
-      peer.on('call', (call) => {
-        if (!isMounted) return;
-
-        if (call.metadata && call.metadata.type === 'WEBCAM') {
-          console.log("Receiving WEBCAM call. Answering with local stream:", !!localCamStreamRef.current);
-          call.answer(localCamStreamRef.current);
-          // applyBandwidthOptimizations(call, 'webcam'); // REMOVED: Modifying senders on the answerer can cause tracks to drop in some browsers
-          camCallRef.current = call;
-          call.on('stream', (remoteStream) => {
-            console.log("Answerer received remote WEBCAM stream:", remoteStream);
-            setRemoteCamStream(remoteStream);
-            if (remoteVideoCamRef.current) {
-              remoteVideoCamRef.current.srcObject = remoteStream;
-              remoteVideoCamRef.current.play().catch(e => console.error("Webcam autoplay blocked:", e));
-            }
-          });
-        } else {
-          call.answer();
-
-          call.on('stream', (remoteStream) => {
-            if (videoRef.current) {
-              videoRef.current.removeAttribute('src');
-              videoRef.current.srcObject = remoteStream;
-              videoRef.current.play().catch(e => console.error("Autoplay blocked:", e));
-              startStatsMonitoring(call, false);
-            }
-          });
-        }
-      });
-
-      peer.on('error', (err) => {
-        console.error('Peer error:', err);
-        if (isMounted) setConnectionStatus(`Error: ${err.type}`);
-      });
-    };
-
-    initPeer();
-
     return () => {
-      isMounted = false;
       cleanupMediaAndCalls();
-      if (peerInstance.current) {
-        peerInstance.current.destroy();
-        peerInstance.current = null;
-      }
+      stopMovieShare();
       if (videoUrlRef.current) URL.revokeObjectURL(videoUrlRef.current);
       if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
         audioContextRef.current.close().catch(console.error);
       }
-      if (localCamStreamRef.current) {
-        localCamStreamRef.current.getTracks().forEach(t => t.stop());
-        localCamStreamRef.current = null;
-      }
     };
   }, []);
 
-  const handleIncomingData = (data) => {
-    if (!data || !data.type) return;
+  // ── Subscribe to data channel events for video sync ──
+  useEffect(() => {
+    const unsubscribe = subscribeToData((data) => {
+      if (!data || !data.type) return;
 
-    if (data.type === 'STREAM_TAKEOVER') {
-      setIsStreamer(false);
-      if (videoUrlRef.current) {
-        URL.revokeObjectURL(videoUrlRef.current);
-        videoUrlRef.current = '';
-      }
-      if (videoRef.current) {
-        videoRef.current.removeAttribute('src');
-        videoRef.current.srcObject = null;
-      }
-    } else if (data.type === 'SYNC_STATE') {
-      if (!isStreamer && !isScrubbing && Date.now() > ignoreSyncUntil.current) {
-        setCurrentTime(data.currentTime);
-        setDuration(data.duration);
-        setIsPaused(data.isPaused);
-      }
-    } else if (data.type === 'COMMAND') {
-      if (isStreamer && videoRef.current) {
-        const video = videoRef.current;
-        if (data.action === 'play') {
-          video.play().catch(console.error);
-        } else if (data.action === 'pause') {
-          video.pause();
-        } else if (data.action === 'seek') {
-          if (data.value !== undefined) {
-            video.currentTime = data.value;
+      if (data.type === 'STREAM_TAKEOVER') {
+        setIsStreamer(false);
+        if (videoUrlRef.current) {
+          URL.revokeObjectURL(videoUrlRef.current);
+          videoUrlRef.current = '';
+        }
+        if (videoRef.current) {
+          videoRef.current.removeAttribute('src');
+          videoRef.current.srcObject = null;
+        }
+      } else if (data.type === 'SYNC_STATE') {
+        if (!isStreamer && !isScrubbing && Date.now() > ignoreSyncUntil.current) {
+          setCurrentTime(data.currentTime);
+          setDuration(data.duration);
+          setIsPaused(data.isPaused);
+        }
+      } else if (data.type === 'COMMAND') {
+        if (isStreamer && videoRef.current) {
+          const video = videoRef.current;
+          if (data.action === 'play') {
+            video.play().catch(console.error);
+          } else if (data.action === 'pause') {
+            video.pause();
+          } else if (data.action === 'seek') {
+            if (data.value !== undefined) {
+              video.currentTime = data.value;
+            }
           }
         }
       }
-    } else if (data.type === 'MEDIA_STATE') {
-      setUser2Media({ mic: data.mic, cam: data.cam });
-    }
-  };
-
-  const toggleMic = () => {
-    const newState = !user1Media.mic;
-    setUser1Media(prev => ({ ...prev, mic: newState }));
-    if (localCamStreamRef.current) {
-      localCamStreamRef.current.getAudioTracks().forEach(t => t.enabled = newState);
-    }
-    if (connectionRef.current && connectionRef.current.open) {
-      connectionRef.current.send({ type: 'MEDIA_STATE', mic: newState, cam: user1Media.cam });
-    }
-  };
-
-  const toggleCam = () => {
-    const newState = !user1Media.cam;
-    setUser1Media(prev => ({ ...prev, cam: newState }));
-    if (localCamStreamRef.current) {
-      localCamStreamRef.current.getVideoTracks().forEach(t => t.enabled = newState);
-    }
-    if (connectionRef.current && connectionRef.current.open) {
-      connectionRef.current.send({ type: 'MEDIA_STATE', mic: user1Media.mic, cam: newState });
-    }
-  };
-
-  const connectToPeer = () => {
-    const targetId = remotePeerId.trim().toUpperCase();
-    if (!targetId) return;
-    const peer = peerInstance.current;
-    if (!peer) return;
-
-    setIsCalling(true);
-    setConnectionStatus(`Calling ${targetId}...`);
-    const conn = peer.connect(targetId);
-    connectionRef.current = conn;
-
-    conn.on('open', () => {
-      // Don't set Connected yet. We wait for CALL_ACCEPTED via data event.
     });
 
-    conn.on('data', (data) => {
-      if (data.type === 'CALL_ACCEPTED') {
-        setIsCalling(false);
-        setConnectionStatus(`Connected to ${conn.peer}`);
-        setConnection(conn);
-        conn.send({ type: 'MEDIA_STATE', ...user1MediaRef.current });
+    return unsubscribe;
+  }, [subscribeToData, isStreamer, isScrubbing]);
 
-        // Initiate WEBCAM call to the peer
-        if (localCamStreamRef.current) {
-          console.log("Caller initiating WEBCAM call to", conn.peer);
-          const camCall = peerInstance.current.call(conn.peer, localCamStreamRef.current, { metadata: { type: 'WEBCAM' } });
-          applyBandwidthOptimizations(camCall, 'webcam');
-          camCallRef.current = camCall;
-          camCall.on('stream', (remoteStream) => {
-            console.log("Caller received remote WEBCAM stream:", remoteStream);
-            setRemoteCamStream(remoteStream);
-            if (remoteVideoCamRef.current) {
-              remoteVideoCamRef.current.srcObject = remoteStream;
-              remoteVideoCamRef.current.play().catch(e => console.error("Webcam autoplay blocked:", e));
-            }
-          });
-        } else {
-          console.warn("Caller has no local webcam stream to initiate the call with.");
-        }
-        
-      } else if (data.type === 'CALL_REJECTED') {
-        setIsCalling(false);
-        setConnectionStatus('Call rejected by peer');
-        conn.close();
-        setConnection(null);
-      } else if (handleIncomingDataRef.current) {
-        handleIncomingDataRef.current(data);
-      }
-    });
-
-    conn.on('close', () => {
-      setIsCalling(false);
-      setConnectionStatus((prev) => prev === 'Call rejected by peer' ? prev : 'Disconnected');
-      setConnection(null);
-    });
-    
-    conn.on('error', (err) => {
-      console.error('Connection error:', err);
-      setIsCalling(false);
-      setConnectionStatus('Error');
-    });
-  };
-
-  const acceptCall = () => {
-    if (!incomingCall) return;
-    setConnection(incomingCall);
-    setConnectionStatus(`Connected to ${incomingCall.peer}`);
-    incomingCall.send({ type: 'CALL_ACCEPTED' });
-    incomingCall.send({ type: 'MEDIA_STATE', ...user1MediaRef.current });
-    setIncomingCall(null);
-  };
-
-  const rejectCall = () => {
-    if (!incomingCall) return;
-    incomingCall.send({ type: 'CALL_REJECTED' });
-    setTimeout(() => incomingCall.close(), 500);
-    setIncomingCall(null);
-    setConnectionStatus('Disconnected');
-  };
-  
-  const cancelCall = () => {
-    if (connectionRef.current) {
-      connectionRef.current.close();
-      connectionRef.current = null;
-    }
-    setIsCalling(false);
-    setConnectionStatus('Disconnected');
-  };
-
+  // ── Movie file handling & capture stream pipeline ──
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -536,36 +252,63 @@ export default function WebRTCWatchParty() {
         videoRef.current.src = url;
       }
 
-      if (connectionRef.current && connectionRef.current.open) {
-        connectionRef.current.send({ type: 'STREAM_TAKEOVER' });
-      }
+      // Notify the peer that we are taking over as the streamer
+      sendData({ type: 'STREAM_TAKEOVER' });
     }
   };
 
-  const startStatsMonitoring = (call, isStreamerRole) => {
-    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
-    
-    statsIntervalRef.current = setInterval(async () => {
-      if (!call.peerConnection) return;
+  /**
+   * Enforces 1080p/4K bitrates and prevents WebRTC from degrading resolution.
+   */
+  const applyHighQualitySenderSettings = (peerConnection) => {
+    if (!peerConnection) return;
+
+    setTimeout(() => {
       try {
-        const stats = await call.peerConnection.getStats();
-        let isPoor = false;
-        
-        stats.forEach(report => {
-          if (isStreamerRole && report.type === 'outbound-rtp' && report.kind === 'video') {
-            if (report.qualityLimitationReason && report.qualityLimitationReason !== 'none') {
-              isPoor = true;
+        const senders = peerConnection.getSenders();
+        senders.forEach((sender) => {
+          if (sender.track && sender.track.kind === 'video') {
+            const params = sender.getParameters();
+            if (!params.encodings || params.encodings.length === 0) {
+              params.encodings = [{}];
             }
-          } else if (!isStreamerRole && report.type === 'inbound-rtp' && report.kind === 'video') {
-             if (report.packetsLost > 50 || report.fractionLost > 0.1) {
-               isPoor = true;
-             }
+
+            // Set max bitrate to 8 Mbps (8,000,000 bps) for high-definition streaming
+            params.encodings[0].maxBitrate = 8000000;
+            params.encodings[0].priority = 'high';
+            params.encodings[0].networkPriority = 'high';
+
+            // Critical: Never downscale the resolution, prioritize frame detail
+            params.degradationPreference = 'maintain-resolution';
+
+            sender.setParameters(params).catch((err) => {
+              console.warn('Unable to set RTCRtpSender parameters:', err);
+            });
           }
         });
-        
-        setNetworkQuality(isPoor ? 'Poor' : 'Good');
-      } catch (e) {
-        // ignore
+      } catch (err) {
+        console.warn('Sender optimization failed:', err);
+      }
+    }, 500);
+  };
+
+  const startStatsMonitoring = (movieStream, isStreamerRole) => {
+    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+
+    // Stats monitoring requires a peerConnection, which we don't have direct access to
+    // from the context. We skip detailed RTCPeerConnection stats for now and just monitor
+    // the stream's track states.
+    statsIntervalRef.current = setInterval(() => {
+      if (!movieStream || movieStream.getTracks().length === 0) {
+        setNetworkQuality('Poor');
+        return;
+      }
+
+      const videoTrack = movieStream.getVideoTracks()[0];
+      if (videoTrack && videoTrack.readyState === 'ended') {
+        setNetworkQuality('Poor');
+      } else {
+        setNetworkQuality('Good');
       }
     }, 3000);
   };
@@ -577,13 +320,13 @@ export default function WebRTCWatchParty() {
 
     cleanupMediaAndCalls();
 
-    if (!peerInstance.current || !connectionRef.current) return;
+    if (!isConnected) return;
 
     let finalStream = new MediaStream();
     let fallbackToCanvas = false;
     let capturedVideoTrack = null;
     let originalAudioTrack = null;
-    
+
     try {
       // Capture the source video at full 60fps / native refresh rate
       const captured = video.captureStream ? video.captureStream(60) : (video.mozCaptureStream ? video.mozCaptureStream(60) : null);
@@ -624,7 +367,7 @@ export default function WebRTCWatchParty() {
       } else {
         animationFrameId.current = requestAnimationFrame(renderFrame);
       }
-      
+
       const canvasStream = canvas.captureStream(60);
       if (canvasStream.getVideoTracks().length > 0) {
         capturedVideoTrack = canvasStream.getVideoTracks()[0];
@@ -647,17 +390,17 @@ export default function WebRTCWatchParty() {
       }
       const audioCtx = audioContextRef.current;
       if (audioCtx.state === 'suspended') audioCtx.resume();
-      
+
       // CRITICAL: Only create these nodes ONCE per <video> element
       if (!mediaElementSourceRef.current) {
         mediaElementSourceRef.current = audioCtx.createMediaElementSource(video);
         mediaStreamDestinationRef.current = audioCtx.createMediaStreamDestination();
-        
+
         mediaElementSourceRef.current.connect(mediaStreamDestinationRef.current);
         // Connect to destination so the local streamer can still hear the movie
         mediaElementSourceRef.current.connect(audioCtx.destination);
       }
-      
+
       if (mediaStreamDestinationRef.current.stream.getAudioTracks().length > 0) {
         finalStream.addTrack(mediaStreamDestinationRef.current.stream.getAudioTracks()[0]);
       }
@@ -665,42 +408,32 @@ export default function WebRTCWatchParty() {
       console.warn("Web Audio API failed, falling back to captureStream track", e);
       if (originalAudioTrack) finalStream.addTrack(originalAudioTrack);
     }
-    
-    if (!finalStream) return;
+
+    if (!finalStream || finalStream.getTracks().length === 0) return;
 
     streamRef.current = finalStream;
 
-    const call = peerInstance.current.call(connectionRef.current.peer, finalStream);
-    mediaCallRef.current = call;
-    
-    // Elevate bitrate & quality parameters on the WebRTC connection
-    if (call.peerConnection) {
-      applyHighQualitySenderSettings(call.peerConnection);
-      call.peerConnection.addEventListener('connectionstatechange', () => {
-        if (call.peerConnection.connectionState === 'connected') {
-          applyHighQualitySenderSettings(call.peerConnection);
-        }
-      });
-    }
+    // Use CallContext's startMovieShare to send the movie stream via PeerJS
+    startMovieShare(finalStream);
 
-    startStatsMonitoring(call, true);
+    startStatsMonitoring(finalStream, true);
   };
 
   const sendSyncState = () => {
     if (!isStreamer || !videoRef.current) return;
-    
+
     const video = videoRef.current;
     setCurrentTime(video.currentTime);
     setDuration(video.duration || 0);
     setIsPaused(video.paused);
 
-    if (!connectionRef.current || !connectionRef.current.open) return;
+    if (!isConnected) return;
 
     const now = Date.now();
     if (now - lastSyncTime.current < 250) return;
     lastSyncTime.current = now;
 
-    connectionRef.current.send({
+    sendData({
       type: 'SYNC_STATE',
       currentTime: video.currentTime,
       duration: video.duration || 0,
@@ -721,9 +454,9 @@ export default function WebRTCWatchParty() {
       setDuration(video.duration || 0);
       setIsPaused(video.paused);
 
-      if (!connectionRef.current || !connectionRef.current.open) return;
-      
-      connectionRef.current.send({
+      if (!isConnected) return;
+
+      sendData({
         type: 'SYNC_STATE',
         currentTime: video.currentTime,
         duration: video.duration || 0,
@@ -745,9 +478,7 @@ export default function WebRTCWatchParty() {
         else video.pause();
       }
     } else {
-      if (connectionRef.current && connectionRef.current.open) {
-        connectionRef.current.send({ type: 'COMMAND', action: isPaused ? 'play' : 'pause' });
-      }
+      sendData({ type: 'COMMAND', action: isPaused ? 'play' : 'pause' });
       setIsPaused(!isPaused);
     }
   };
@@ -761,9 +492,7 @@ export default function WebRTCWatchParty() {
       sendSyncState();
     } else {
       ignoreSyncUntil.current = Date.now() + 500;
-      if (connectionRef.current && connectionRef.current.open) {
-        connectionRef.current.send({ type: 'COMMAND', action: 'seek', value: newTime });
-      }
+      sendData({ type: 'COMMAND', action: 'seek', value: newTime });
     }
   };
 
@@ -809,6 +538,10 @@ export default function WebRTCWatchParty() {
     };
   }, []);
 
+  // Derive connection status string from context
+  const connectionStatus = isConnected ? 'Connected' : (callStatus || 'Disconnected');
+  const isCalling = callStatus === 'Ringing...';
+
   return (
     <div className="watch-party-room">
       <style>{`
@@ -850,20 +583,20 @@ export default function WebRTCWatchParty() {
 
       <div className="connection-row top-controls-row" style={{ display: 'flex', gap: '1rem', width: '100%', maxWidth: '1600px', marginBottom: '0.25rem', alignItems: 'flex-end' }}>
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap' }}>
-            <button className="btn-join" onClick={() => navigate('/party')} style={{ whiteSpace: 'nowrap' }}>
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', width: '100%' }}>
+            <button className="btn-join" onClick={() => navigate('/party')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <polygon points="5 3 19 12 5 21 5 3"></polygon>
               </svg>
               JOIN A PARTY
             </button>
-            <button className="btn-join" onClick={() => navigate('/local-sync')} style={{ whiteSpace: 'nowrap' }}>
+            <button className="btn-join" onClick={() => navigate('/local-sync')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
               </svg>
               SYNC LOCAL VIDEO
             </button>
-            <button className="btn-join" onClick={() => navigate('/screen-share')} style={{ whiteSpace: 'nowrap' }}>
+            <button className="btn-join" onClick={() => navigate('/screen-share')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
@@ -871,7 +604,7 @@ export default function WebRTCWatchParty() {
               </svg>
               SHARE SCREEN
             </button>
-            <button className="btn-join active" onClick={() => navigate('/watch-party')} style={{ whiteSpace: 'nowrap' }}>
+            <button className="btn-join active" onClick={() => navigate('/watch-party')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <polygon points="23 7 16 12 23 17 23 7"></polygon>
                 <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
@@ -898,9 +631,9 @@ export default function WebRTCWatchParty() {
           </div>
         </div>
 
-        <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px' }}>
+        <div className="room-id-panel" style={{ flex: 1, margin: 0, height: '52px', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
           <span className="room-id-label" style={{ whiteSpace: 'nowrap' }}>
-            {connectionStatus.startsWith('Connected') ? "Active Room ID:" : "Your Room ID:"}
+            {isConnected ? "Active Room ID:" : "Your Room ID:"}
           </span>
           <code className="room-id-code">{peerId || "Generating..."}</code>
           <button onClick={copyToClipboard} className="copy-id-btn" title="Copy Room ID">
@@ -908,7 +641,7 @@ export default function WebRTCWatchParty() {
           </button>
         </div>
 
-        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative' }}>
+        <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
           <div style={{ position: 'absolute', top: '-60px', right: '0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
             <div 
               onClick={() => setIsDarkMode(!isDarkMode)}
@@ -972,13 +705,13 @@ export default function WebRTCWatchParty() {
             </div>
           </div>
 
-          {connectionStatus.startsWith('Connected') ? (
+          {isConnected ? (
             <div className="connected-panel-wrap">
               <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
                 <CheckCircle2 size={18} className="text-green-600" />
-                <span>Connected to <strong>{connectionRef.current?.peer || "Partner"}</strong></span>
+                <span>Connected to <strong>Partner</strong></span>
               </div>
-              <button onClick={() => { if (connection) connection.close(); }} className="leave-btn" title="Leave Call">
+              <button onClick={leaveCall} className="leave-btn" title="Leave Call">
                 <PhoneOff size={16} />
                 Leave Call
               </button>
@@ -987,9 +720,9 @@ export default function WebRTCWatchParty() {
             <div className="connected-panel-wrap">
               <div className="connected-badge" style={{ whiteSpace: 'nowrap', backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}>
                 <PhoneCall size={18} className="animate-pulse" />
-                <span>Calling <strong>{remotePeerId}</strong>...</span>
+                <span>Calling <strong>{friendId}</strong>...</span>
               </div>
-              <button onClick={cancelCall} className="leave-btn" style={{ backgroundColor: '#ef4444' }} title="Cancel Call">
+              <button onClick={leaveCall} className="leave-btn" style={{ backgroundColor: '#ef4444' }} title="Cancel Call">
                 <PhoneOff size={16} />
                 Cancel
               </button>
@@ -998,13 +731,13 @@ export default function WebRTCWatchParty() {
             <>
               <input
                 type="text"
-                placeholder="Partner's ID"
-                value={remotePeerId}
-                onChange={(e) => setRemotePeerId(e.target.value.toUpperCase())}
+                placeholder="Paste Friend's ID here..."
+                value={friendId}
+                onChange={(e) => setFriendId(e.target.value.toUpperCase())}
                 className="friend-id-input"
                 style={{ textTransform: "uppercase", height: '36px' }}
               />
-              <button onClick={connectToPeer} disabled={!remotePeerId.trim()} className="connect-btn" style={{ whiteSpace: 'nowrap', height: '36px' }}>
+              <button onClick={callFriend} disabled={!friendId.trim()} className="connect-btn" style={{ whiteSpace: 'nowrap', height: '36px' }}>
                 <PhoneCall size={16} />
                 Connect
               </button>
@@ -1033,7 +766,7 @@ export default function WebRTCWatchParty() {
               onPlay={handlePlayPauseEvent}
               onPause={handlePlayPauseEvent}
               onWaiting={handleWaiting}
-              style={{ width: "100%", height: "100%", objectFit: "contain", cursor: controlsVisible ? "pointer" : "none", display: videoUrlRef.current || (connectionStatus.startsWith('Connected') && !isStreamer) ? "block" : "none" }}
+              style={{ width: "100%", height: "100%", objectFit: "contain", cursor: controlsVisible ? "pointer" : "none", display: videoUrlRef.current || (isConnected && !isStreamer) ? "block" : "none" }}
             />
             {incomingCall && (
               <div
@@ -1060,7 +793,7 @@ export default function WebRTCWatchParty() {
                   </div>
                   <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "600", color: isDarkMode ? '#f8fafc' : '#1e293b' }}>Incoming Call</h3>
                   <p style={{ margin: "0.5rem 0 0 0", color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-                    <strong style={{ color: isDarkMode ? '#e2e8f0' : '#334155' }}>{incomingCall.peer}</strong> wants to connect.
+                    <strong style={{ color: isDarkMode ? '#e2e8f0' : '#334155' }}>{incomingCall.callerId || "Someone"}</strong> wants to connect.
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: "1rem", width: "100%" }}>
@@ -1073,7 +806,7 @@ export default function WebRTCWatchParty() {
                 </div>
               </div>
             )}
-            {(!videoUrlRef.current && (!connectionStatus.startsWith('Connected') || (connectionStatus.startsWith('Connected') && isStreamer && !videoUrlRef.current))) && (
+            {(!videoUrlRef.current && (!isConnected || (isConnected && isStreamer && !videoUrlRef.current))) && (
               <div
                 style={{
                   display: "flex",
@@ -1170,7 +903,7 @@ export default function WebRTCWatchParty() {
                   autoPlay
                   playsInline
                   muted
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#333' }}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#333', transform: 'scaleX(-1)' }}
                 />
                 {!user1Media.cam && (
                   <div className="waiting-overlay">
@@ -1181,13 +914,13 @@ export default function WebRTCWatchParty() {
                 <div className="participant-tag-wrap" style={{ zIndex: 30 }}>
                   <span className="participant-tag">You</span>
                   <div className="local-volume-meter">
-                    <div className="local-volume-fill" style={{ height: user1Media.mic ? '50%' : '0%' }} />
+                    <div ref={volumeBarRef} className="local-volume-fill" />
                   </div>
                 </div>
               </div>
               <div className="media-controls">
                 <button
-                  onClick={toggleMic}
+                  onClick={toggleLocalMic}
                   onMouseDown={(e) => e.stopPropagation()}
                   className={`media-toggle-btn ${user1Media.mic ? "is-on" : "is-off"}`}
                   title={user1Media.mic ? "Mute Microphone" : "Unmute Microphone"}
@@ -1195,7 +928,7 @@ export default function WebRTCWatchParty() {
                   {user1Media.mic ? <Mic size={18} /> : <MicOff size={18} />}
                 </button>
                 <button
-                  onClick={toggleCam}
+                  onClick={toggleLocalCam}
                   onMouseDown={(e) => e.stopPropagation()}
                   className={`media-toggle-btn ${user1Media.cam ? "is-on" : "is-off"}`}
                   title={user1Media.cam ? "Turn Off Camera" : "Turn On Camera"}
@@ -1225,20 +958,20 @@ export default function WebRTCWatchParty() {
                   style={{ width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#222' }}
                 />
 
-                {!connectionStatus.startsWith('Connected') && (
+                {!isConnected && (
                   <div className="waiting-overlay">
                     <VideoOff className="waiting-icon" />
-                    <span className="waiting-text">Waiting for partner...</span>
+                    <span className="waiting-text">Waiting for friend...</span>
                   </div>
                 )}
-                {connectionStatus.startsWith('Connected') && !user2Media.cam && (
+                {isConnected && !user2Media.cam && (
                   <div className="waiting-overlay">
                     <VideoOff className="waiting-icon" />
-                    <span className="waiting-text">Partner's camera is off</span>
+                    <span className="waiting-text">Friend's camera is off</span>
                   </div>
                 )}
                 <div className="participant-tag-wrap participant-tag-wrap--friend">
-                  <span className="participant-tag">Partner</span>
+                  <span className="participant-tag">Friend</span>
                 </div>
               </div>
               <div className="media-controls media-controls--friend">
