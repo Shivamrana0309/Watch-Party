@@ -20,7 +20,8 @@ export default function WebRTCWatchParty() {
     isConnected, callStatus, incomingCall,
     user1Media, user2Media, toggleLocalMic, toggleLocalCam,
     sendData, subscribeToData,
-    localVideoDOM, remoteVideoDOM
+    localVideoDOM, remoteVideoDOM,
+    activeRoomId
   } = useCallContext();
 
   // UI & Player State
@@ -709,7 +710,7 @@ export default function WebRTCWatchParty() {
             <div className="connected-panel-wrap">
               <div className="connected-badge" style={{ whiteSpace: 'nowrap' }}>
                 <CheckCircle2 size={18} className="text-green-600" />
-                <span>Connected to <strong>Partner</strong></span>
+                <span>Connected in Room <strong>{activeRoomId}</strong></span>
               </div>
               <button onClick={leaveCall} className="leave-btn" title="Leave Call">
                 <PhoneOff size={16} />
@@ -746,6 +747,24 @@ export default function WebRTCWatchParty() {
         </div>
       </div>
 
+      {callStatus && <div className="call-status-alert">{callStatus}</div>}
+
+      {incomingCall && (
+        <div className="incoming-call-modal">
+          <span>
+            Incoming request from: <strong>{incomingCall.callerId}</strong>
+          </span>
+          <div className="incoming-call-actions">
+            <button onClick={acceptCall} className="accept-btn">
+              Accept
+            </button>
+            <button onClick={rejectCall} className="reject-btn">
+              Reject
+            </button>
+          </div>
+        </div>
+      )}
+
       <div
         ref={containerRef}
         className={isFullscreen ? "video-shell is-fullscreen" : "video-shell"}
@@ -768,44 +787,6 @@ export default function WebRTCWatchParty() {
               onWaiting={handleWaiting}
               style={{ width: "100%", height: "100%", objectFit: "contain", cursor: controlsVisible ? "pointer" : "none", display: videoUrlRef.current || (isConnected && !isStreamer) ? "block" : "none" }}
             />
-            {incomingCall && (
-              <div
-                style={{
-                  position: "absolute",
-                  top: "50%",
-                  left: "50%",
-                  transform: "translate(-50%, -50%)",
-                  backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-                  padding: "2rem",
-                  borderRadius: "1rem",
-                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  gap: "1.5rem",
-                  zIndex: 100,
-                  border: isDarkMode ? '1px solid #374151' : '1px solid #e5e7eb'
-                }}
-              >
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ display: "inline-flex", padding: "1rem", borderRadius: "9999px", backgroundColor: "#dbeafe", color: "#2563eb", marginBottom: "1rem" }}>
-                    <PhoneCall size={32} className="animate-pulse" />
-                  </div>
-                  <h3 style={{ margin: 0, fontSize: "1.25rem", fontWeight: "600", color: isDarkMode ? '#f8fafc' : '#1e293b' }}>Incoming Call</h3>
-                  <p style={{ margin: "0.5rem 0 0 0", color: isDarkMode ? '#94a3b8' : '#64748b' }}>
-                    <strong style={{ color: isDarkMode ? '#e2e8f0' : '#334155' }}>{incomingCall.callerId || "Someone"}</strong> wants to connect.
-                  </p>
-                </div>
-                <div style={{ display: "flex", gap: "1rem", width: "100%" }}>
-                  <button onClick={rejectCall} style={{ flex: 1, padding: "0.75rem", borderRadius: "0.5rem", border: "none", backgroundColor: "#fee2e2", color: "#ef4444", fontWeight: "600", cursor: "pointer", transition: "all 0.2s" }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#fecaca'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#fee2e2'}>
-                    Reject
-                  </button>
-                  <button onClick={acceptCall} style={{ flex: 1, padding: "0.75rem", borderRadius: "0.5rem", border: "none", backgroundColor: "#dcfce3", color: "#16a34a", fontWeight: "600", cursor: "pointer", transition: "all 0.2s" }} onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#bbf7d0'} onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#dcfce3'}>
-                    Accept
-                  </button>
-                </div>
-              </div>
-            )}
             {(!videoUrlRef.current && (!isConnected || (isConnected && isStreamer && !videoUrlRef.current))) && (
               <div
                 style={{

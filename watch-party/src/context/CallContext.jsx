@@ -41,6 +41,9 @@ export const CallProvider = ({ children }) => {
   
   const [peerId, setPeerId] = useState("");
   const [friendId, setFriendId] = useState("");
+  const friendIdRef = useRef("");
+  useEffect(() => { friendIdRef.current = friendId; }, [friendId]);
+
   const [user1Media, setUser1Media] = useState(() => {
     const saved = sessionStorage.getItem('userMediaPref');
     if (saved) {
@@ -51,7 +54,13 @@ export const CallProvider = ({ children }) => {
   const [user2Media, setUser2Media] = useState({ mic: true, cam: true });
 
   const [isConnected, setIsConnected] = useState(false);
+  const isConnectedRef = useRef(false);
+  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
+
   const [activeRoomId, setActiveRoomId] = useState("");
+  const activeRoomIdRef = useRef("");
+  useEffect(() => { activeRoomIdRef.current = activeRoomId; }, [activeRoomId]);
+
   const [incomingCall, setIncomingCall] = useState(null);
   const [callStatus, setCallStatus] = useState("");
 
@@ -209,9 +218,7 @@ export const CallProvider = ({ children }) => {
         setCallStatus("Call was rejected.");
         setTimeout(() => setCallStatus(""), 4000);
       } else if (data.type === "CALL_LEAVE") {
-        leaveCall();
-        setCallStatus("Friend left the call.");
-        setTimeout(() => setCallStatus(""), 4000);
+        leaveCall(true);
       } else {
         // Forward non-core events to subscribers (e.g. video sync events)
         dataListeners.current.forEach(cb => cb(data));
@@ -403,12 +410,13 @@ export const CallProvider = ({ children }) => {
         } else if (data.type === "CALL_REJECTED") {
           leaveCall();
           setCallStatus("Call rejected.");
+          setTimeout(() => setCallStatus(""), 3000);
         } else if (data.type === "MEDIA_STATE") {
           setUser2Media({ mic: data.mic, cam: data.cam });
         } else if (data.type === "SCREEN_SHARE_STOPPED") {
           setRemoteScreenStream(null);
         } else if (data.type === "CALL_LEAVE") {
-          leaveCall();
+          leaveCall(true);
         } else {
           dataListeners.current.forEach(cb => cb(data));
         }
@@ -432,7 +440,7 @@ export const CallProvider = ({ children }) => {
       incomingCall.conn.on("data", (data) => {
         if (data.type === "MEDIA_STATE") setUser2Media({ mic: data.mic, cam: data.cam });
         else if (data.type === "SCREEN_SHARE_STOPPED") setRemoteScreenStream(null);
-        else if (data.type === "CALL_LEAVE") leaveCall();
+        else if (data.type === "CALL_LEAVE") leaveCall(true);
         else dataListeners.current.forEach(cb => cb(data));
       });
       setIncomingCall(null);
@@ -441,8 +449,17 @@ export const CallProvider = ({ children }) => {
 
   const rejectCall = () => {
     if (incomingCall) {
-      incomingCall.conn.send({ type: "CALL_REJECTED" });
+      try { incomingCall.conn.send({ type: "CALL_REJECTED" }); } catch {}
+      setTimeout(() => {
+        try { incomingCall.conn.close(); } catch {}
+      }, 500);
       setIncomingCall(null);
+      setCallStatus("You rejected the call.");
+      setTimeout(() => setCallStatus(""), 3000);
+      
+      if (dataConnRef.current === incomingCall.conn) {
+        dataConnRef.current = null;
+      }
     }
   };
 
@@ -475,7 +492,12 @@ export const CallProvider = ({ children }) => {
     }
   };
 
-  const leaveCall = () => {
+  const leaveCall = (isRemote = false) => {
+    const wasConnected = isConnectedRef.current;
+    
+    // Safely capture the remote ID using refs to bypass stale closures in event listeners
+    const remoteId = activeRoomIdRef.current || friendIdRef.current || activeRoomId || friendId;
+
     if (dataConnRef.current && dataConnRef.current.open) {
       try { dataConnRef.current.send({ type: "CALL_LEAVE" }); } catch {}
       dataConnRef.current.close();
@@ -501,11 +523,29 @@ export const CallProvider = ({ children }) => {
     }
 
     setIsConnected(false);
+    setIncomingCall(null);
+    
+    // Only show "left the call" notifications if a call was actually established
+    // This prevents overwriting "You rejected the call" or showing weird messages on cancel
+    if (wasConnected) {
+      // STRICT CHECK: Ignore React MouseEvents from UI clicks
+      if (isRemote === true) {
+        setCallStatus(`Room ID ${remoteId} left the call.`);
+      } else {
+        setCallStatus("You left the call.");
+      }
+      setTimeout(() => setCallStatus(""), 3000);
+    } else {
+      // If we weren't connected and we manually cancelled the call (isRemote !== true),
+      // we need to clear the "Ringing..." status so it doesn't get stuck.
+      if (isRemote !== true) {
+        setCallStatus("");
+      }
+    }
+    
     setActiveRoomId("");
     setFriendId("");
     setUser2Media({ mic: true, cam: true });
-    setCallStatus("You left the call.");
-    setTimeout(() => setCallStatus(""), 3000);
   };
 
   // --- Route Synchronization Logic ---
