@@ -41,6 +41,9 @@ export const CallProvider = ({ children }) => {
   
   const [peerId, setPeerId] = useState("");
   const [friendId, setFriendId] = useState("");
+  const friendIdRef = useRef("");
+  useEffect(() => { friendIdRef.current = friendId; }, [friendId]);
+
   const [user1Media, setUser1Media] = useState(() => {
     const saved = sessionStorage.getItem('userMediaPref');
     if (saved) {
@@ -51,13 +54,23 @@ export const CallProvider = ({ children }) => {
   const [user2Media, setUser2Media] = useState({ mic: true, cam: true });
 
   const [isConnected, setIsConnected] = useState(false);
+  const isConnectedRef = useRef(false);
+  useEffect(() => { isConnectedRef.current = isConnected; }, [isConnected]);
+
   const [activeRoomId, setActiveRoomId] = useState("");
+  const activeRoomIdRef = useRef("");
+  useEffect(() => { activeRoomIdRef.current = activeRoomId; }, [activeRoomId]);
+
   const [incomingCall, setIncomingCall] = useState(null);
   const [callStatus, setCallStatus] = useState("");
+
+  const [localMovieStream, setLocalMovieStream] = useState(null);
+  const [remoteMovieStream, setRemoteMovieStream] = useState(null);
 
   const peerInstance = useRef(null);
   const currentCallRef = useRef(null);
   const screenCallRef = useRef(null);
+  const movieCallRef = useRef(null);
   const dataConnRef = useRef(null);
   const user1MediaRef = useRef(user1Media);
   const dataListeners = useRef(new Set());
@@ -70,6 +83,7 @@ export const CallProvider = ({ children }) => {
     localVideoDOM.current.autoPlay = true;
     localVideoDOM.current.playsInline = true;
     localVideoDOM.current.muted = true;
+    localVideoDOM.current.style.transform = "scaleX(-1)";
 
     remoteVideoDOM.current.autoPlay = true;
     remoteVideoDOM.current.playsInline = true;
@@ -166,6 +180,11 @@ export const CallProvider = ({ children }) => {
             call.on("stream", (screenStream) => {
               if (isMounted) setRemoteScreenStream(screenStream);
             });
+          } else if (call.metadata && call.metadata.type === "MOVIE_SHARE") {
+            call.answer();
+            call.on("stream", (movieStream) => {
+              if (isMounted) setRemoteMovieStream(movieStream);
+            });
           } else {
             if (!myStream) return;
             currentCallRef.current = call;
@@ -192,14 +211,14 @@ export const CallProvider = ({ children }) => {
         setUser2Media({ mic: data.mic, cam: data.cam });
       } else if (data.type === "SCREEN_SHARE_STOPPED") {
         setRemoteScreenStream(null);
+      } else if (data.type === "MOVIE_SHARE_STOPPED") {
+        setRemoteMovieStream(null);
       } else if (data.type === "CALL_REJECTED") {
         leaveCall();
         setCallStatus("Call was rejected.");
         setTimeout(() => setCallStatus(""), 4000);
       } else if (data.type === "CALL_LEAVE") {
-        leaveCall();
-        setCallStatus("Friend left the call.");
-        setTimeout(() => setCallStatus(""), 4000);
+        leaveCall(true);
       } else {
         // Forward non-core events to subscribers (e.g. video sync events)
         dataListeners.current.forEach(cb => cb(data));
@@ -391,12 +410,13 @@ export const CallProvider = ({ children }) => {
         } else if (data.type === "CALL_REJECTED") {
           leaveCall();
           setCallStatus("Call rejected.");
+          setTimeout(() => setCallStatus(""), 3000);
         } else if (data.type === "MEDIA_STATE") {
           setUser2Media({ mic: data.mic, cam: data.cam });
         } else if (data.type === "SCREEN_SHARE_STOPPED") {
           setRemoteScreenStream(null);
         } else if (data.type === "CALL_LEAVE") {
-          leaveCall();
+          leaveCall(true);
         } else {
           dataListeners.current.forEach(cb => cb(data));
         }
@@ -420,7 +440,7 @@ export const CallProvider = ({ children }) => {
       incomingCall.conn.on("data", (data) => {
         if (data.type === "MEDIA_STATE") setUser2Media({ mic: data.mic, cam: data.cam });
         else if (data.type === "SCREEN_SHARE_STOPPED") setRemoteScreenStream(null);
-        else if (data.type === "CALL_LEAVE") leaveCall();
+        else if (data.type === "CALL_LEAVE") leaveCall(true);
         else dataListeners.current.forEach(cb => cb(data));
       });
       setIncomingCall(null);
@@ -429,12 +449,55 @@ export const CallProvider = ({ children }) => {
 
   const rejectCall = () => {
     if (incomingCall) {
-      incomingCall.conn.send({ type: "CALL_REJECTED" });
+      try { incomingCall.conn.send({ type: "CALL_REJECTED" }); } catch {}
+      setTimeout(() => {
+        try { incomingCall.conn.close(); } catch {}
+      }, 500);
       setIncomingCall(null);
+      setCallStatus("You rejected the call.");
+      setTimeout(() => setCallStatus(""), 3000);
+      
+      if (dataConnRef.current === incomingCall.conn) {
+        dataConnRef.current = null;
+      }
     }
   };
 
-  const leaveCall = () => {
+  const startMovieShare = (videoStream) => {
+    setLocalMovieStream(videoStream);
+
+    if (isConnected && activeRoomId && peerInstance.current) {
+      try {
+        const call = peerInstance.current.call(activeRoomId, videoStream, {
+          metadata: { type: "MOVIE_SHARE" },
+        });
+        movieCallRef.current = call;
+      } catch (err) {
+        console.error("Failed to start movie share call:", err);
+      }
+    }
+  };
+
+  const stopMovieShare = () => {
+    if (localMovieStream) {
+      localMovieStream.getTracks().forEach((t) => t.stop());
+      setLocalMovieStream(null);
+    }
+    if (movieCallRef.current) {
+      movieCallRef.current.close();
+      movieCallRef.current = null;
+    }
+    if (dataConnRef.current && dataConnRef.current.open) {
+      dataConnRef.current.send({ type: "MOVIE_SHARE_STOPPED" });
+    }
+  };
+
+  const leaveCall = (isRemote = false) => {
+    const wasConnected = isConnectedRef.current;
+    
+    // Safely capture the remote ID using refs to bypass stale closures in event listeners
+    const remoteId = activeRoomIdRef.current || friendIdRef.current || activeRoomId || friendId;
+
     if (dataConnRef.current && dataConnRef.current.open) {
       try { dataConnRef.current.send({ type: "CALL_LEAVE" }); } catch {}
       dataConnRef.current.close();
@@ -442,20 +505,47 @@ export const CallProvider = ({ children }) => {
     }
     if (currentCallRef.current) currentCallRef.current.close();
     if (screenCallRef.current) screenCallRef.current.close();
+    if (movieCallRef.current) {
+      movieCallRef.current.close();
+      movieCallRef.current = null;
+    }
 
     setRemoteStream(null);
     setRemoteScreenStream(null);
+    setRemoteMovieStream(null);
     if (localScreenStream) {
       localScreenStream.getTracks().forEach(t => t.stop());
       setLocalScreenStream(null);
     }
+    if (localMovieStream) {
+      localMovieStream.getTracks().forEach(t => t.stop());
+      setLocalMovieStream(null);
+    }
 
     setIsConnected(false);
+    setIncomingCall(null);
+    
+    // Only show "left the call" notifications if a call was actually established
+    // This prevents overwriting "You rejected the call" or showing weird messages on cancel
+    if (wasConnected) {
+      // STRICT CHECK: Ignore React MouseEvents from UI clicks
+      if (isRemote === true) {
+        setCallStatus(`Room ID ${remoteId} left the call.`);
+      } else {
+        setCallStatus("You left the call.");
+      }
+      setTimeout(() => setCallStatus(""), 3000);
+    } else {
+      // If we weren't connected and we manually cancelled the call (isRemote !== true),
+      // we need to clear the "Ringing..." status so it doesn't get stuck.
+      if (isRemote !== true) {
+        setCallStatus("");
+      }
+    }
+    
     setActiveRoomId("");
     setFriendId("");
     setUser2Media({ mic: true, cam: true });
-    setCallStatus("You left the call.");
-    setTimeout(() => setCallStatus(""), 3000);
   };
 
   // --- Route Synchronization Logic ---
@@ -496,6 +586,8 @@ export const CallProvider = ({ children }) => {
     remoteStream,
     localScreenStream,
     remoteScreenStream,
+    localMovieStream,
+    remoteMovieStream,
     peerId,
     friendId,
     setFriendId,
@@ -504,6 +596,8 @@ export const CallProvider = ({ children }) => {
     toggleLocalMic,
     toggleLocalCam,
     toggleScreenShare,
+    startMovieShare,
+    stopMovieShare,
     callFriend,
     acceptCall,
     rejectCall,

@@ -3,7 +3,8 @@ import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
 import WatchPartyRoom from './WatchPartyRoom';
 import WatchPartyRoomRefactored from './WatchPartyRoomRefactored';
 import ScreenShareRoom from './ScreenShareRoom';
-import LocalVideoPartyRoom from './LocalVideoPartyRoom'; // <-- 1. Import local sync room
+import LocalVideoPartyRoom from './LocalVideoPartyRoom'; 
+import WebRTCWatchParty from './WebRTCWatchParty';
 import LandingPage from './LandingPage';
 import LoginPage from './LoginPage';
 import SignupPage from './SignupPage';
@@ -65,18 +66,19 @@ function AppRoutes() {
             onSignupClick={() => navigate('/signup')}
             onJoinPartyClick={() => navigate('/party')}
             onScreenShareClick={() => navigate('/screen-share')}
-            onLocalSyncClick={() => navigate('/local-sync')} // <-- 2. Pass local sync callback
+            onLocalSyncClick={() => navigate('/local-sync')} 
+            onWebRTCWatchPartyClick={() => navigate('/watch-party')}
           />
         } 
       />
       <Route path="/login" element={<LoginPage onLoginSuccess={() => navigate('/room')} onNavigateSignup={() => navigate('/signup')} />} />
       <Route path="/signup" element={<SignupPage onSignupSuccess={() => navigate('/login')} onNavigateLogin={() => navigate('/login')} />} />
-      <Route path="/room" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoom /></div>} />
-      
       <Route element={<RoomLayout />}>
+        <Route path="/room" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoom /></div>} />
         <Route path="/party" element={<div className="min-h-screen bg-white py-10"><WatchPartyRoomRefactored /></div>} />
         <Route path="/screen-share" element={<div className="min-h-screen bg-white py-10"><ScreenShareRoom /></div>} />
         <Route path="/local-sync" element={<div className="min-h-screen bg-white py-10"><LocalVideoPartyRoom /></div>} />
+        <Route path="/watch-party" element={<div className="min-h-screen bg-gray-50 py-10"><WebRTCWatchParty /></div>} />
       </Route>
     </Routes>
   );

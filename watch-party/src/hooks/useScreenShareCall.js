@@ -1,5 +1,52 @@
 import { useEffect, useRef, useState } from "react";
 import Peer from "peerjs";
+import Peer from "peerjs";
+
+const applyBandwidthOptimizations = (call, type) => {
+  if (!call || !call.peerConnection) return;
+  const pc = call.peerConnection;
+
+  const applyParams = () => {
+    const senders = pc.getSenders();
+    senders.forEach((sender) => {
+      if (!sender.track) return;
+      const params = sender.getParameters();
+      if (!params.encodings) params.encodings = [{}];
+
+      if (type === 'webcam') {
+        if (sender.track.kind === 'video') {
+          params.encodings[0].maxBitrate = 200000;
+          params.encodings[0].networkPriority = 'low';
+        } else if (sender.track.kind === 'audio') {
+          params.encodings[0].networkPriority = 'high';
+        }
+      } else if (type === 'screen') {
+        if (sender.track.kind === 'video') {
+          params.encodings[0].maxBitrate = 2500000;
+          params.encodings[0].networkPriority = 'default'; // keep medium priority
+          params.degradationPreference = 'maintain-resolution'; // drop frames instead of blurring
+          sender.track.contentHint = 'detail';
+        } else if (sender.track.kind === 'audio') {
+          params.encodings[0].networkPriority = 'high';
+        }
+      }
+
+      try {
+        sender.setParameters(params);
+      } catch (e) {
+        console.warn("Could not set RTCRtpSender parameters", e);
+      }
+    });
+  };
+
+  if (pc.connectionState === 'connected') {
+    applyParams();
+  } else {
+    pc.addEventListener('connectionstatechange', () => {
+      if (pc.connectionState === 'connected') applyParams();
+    });
+  }
+};
 
 export default function useScreenShareCall({
   dataConnRef,
@@ -47,7 +94,7 @@ export default function useScreenShareCall({
     const initMediaAndPeer = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 20 } },
+          video: { width: { ideal: 320 }, height: { ideal: 240 }, frameRate: { ideal: 15 } },
           audio: true,
         });
 
@@ -95,7 +142,8 @@ export default function useScreenShareCall({
         peer.on("call", (call) => {
           // If it's a screen share call, we answer but don't send our webcam stream back on this connection
           if (call.metadata && call.metadata.type === "SCREEN_SHARE") {
-            call.answer(); 
+            call.answer();
+            applyBandwidthOptimizations(call, 'screen');
             call.on("stream", (screenStream) => {
               if (isMounted) setRemoteScreenStream(screenStream);
             });
@@ -104,6 +152,7 @@ export default function useScreenShareCall({
             if (!myStream) return;
             currentCallRef.current = call;
             call.answer(myStream);
+            applyBandwidthOptimizations(call, 'webcam');
             call.on("stream", (userVideoStream) => {
               if (isMounted) setRemoteStream(userVideoStream);
             });
@@ -222,6 +271,7 @@ export default function useScreenShareCall({
         // If we are connected to someone, immediately call them with the screen track
         if (isConnected && activeRoomId) {
           const call = peerInstance.current.call(activeRoomId, stream, { metadata: { type: "SCREEN_SHARE" } });
+          applyBandwidthOptimizations(call, 'screen');
           screenCallRef.current = call;
         }
 
@@ -274,6 +324,7 @@ export default function useScreenShareCall({
           setCallStatus("Connected!");
 
           const call = peerInstance.current.call(friendIdClean, localStream);
+          applyBandwidthOptimizations(call, 'webcam');
           currentCallRef.current = call;
           call.on("stream", (userVideoStream) => setRemoteStream(userVideoStream));
           
@@ -281,7 +332,9 @@ export default function useScreenShareCall({
 
           // If you were already sharing your screen before calling, send it now
           if (localScreenStream) {
-            screenCallRef.current = peerInstance.current.call(friendIdClean, localScreenStream, { metadata: { type: "SCREEN_SHARE" } });
+            const screenCall = peerInstance.current.call(friendIdClean, localScreenStream, { metadata: { type: "SCREEN_SHARE" } });
+            applyBandwidthOptimizations(screenCall, 'screen');
+            screenCallRef.current = screenCall;
           }
 
           setTimeout(() => setCallStatus(""), 3000);
@@ -310,7 +363,9 @@ export default function useScreenShareCall({
 
       // Send screen share if already active
       if (localScreenStream) {
-          screenCallRef.current = peerInstance.current.call(incomingCall.callerId, localScreenStream, { metadata: { type: "SCREEN_SHARE" } });
+          const screenCall = peerInstance.current.call(incomingCall.callerId, localScreenStream, { metadata: { type: "SCREEN_SHARE" } });
+          applyBandwidthOptimizations(screenCall, 'screen');
+          screenCallRef.current = screenCall;
       }
 
       incomingCall.conn.on("data", (data) => {
