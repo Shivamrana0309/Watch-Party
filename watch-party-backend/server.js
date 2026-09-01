@@ -6,29 +6,17 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 
-// Import your User model
 const User = require('./models/User'); 
-
 const app = express();
 
-// Middleware
 app.use(cors());
-app.use(express.json()); // CRUCIAL: Allows Express to parse JSON bodies for login/register
+app.use(express.json()); 
 
 const PORT = process.env.PORT || 9000;
-
-// ==========================================
-// DATABASE CONNECTION
-// ==========================================
 mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB successfully'))
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
-// ==========================================
-// API ROUTES
-// ==========================================
-
-// 1. API endpoint to serve secure TURN credentials
 app.get("/api/turn-credentials", (req, res) => {
   const username = process.env.TURN_USERNAME || "watchparty";
   const credential = process.env.TURN_CREDENTIAL || "SuperSecretPass123";
@@ -56,12 +44,10 @@ app.get("/api/turn-credentials", (req, res) => {
   });
 });
 
-// 2. Register User Route
 app.post('/api/register', async (req, res) => {
     try {
         const { name, username, emailOrMobile, password } = req.body;
 
-        // Check if user already exists
         const existingUser = await User.findOne({ 
             $or: [{ emailOrMobile }, { username }] 
         });
@@ -70,11 +56,9 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ message: 'Username or Email/Mobile already exists' });
         }
 
-        // Hash the password securely
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
-        // Create and save new user
         const newUser = new User({
             name,
             username,
@@ -91,9 +75,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-// --- JWT AUTHENTICATION MIDDLEWARE ---
 const authenticateToken = (req, res, next) => {
-  // The token comes in the header as "Bearer <token>"
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -101,18 +83,15 @@ const authenticateToken = (req, res, next) => {
     return res.status(401).json({ message: "No token provided" });
   }
 
-  // Use your secret key to verify if the token is authentic
   jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
     if (err) {
       return res.status(403).json({ message: "Invalid or expired token" });
     }
-    // If valid, attach the user data to the request and move on
     req.user = user;
     next();
   });
 };
 
-// --- VERIFY SESSION ROUTE ---
 app.get('/api/verify', authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.userId).select('-password');
@@ -129,24 +108,20 @@ app.get('/api/verify', authenticateToken, async (req, res) => {
   }
 });
 
-// 3. Login User Route
 app.post('/api/login', async (req, res) => {
     try {
         const { emailOrMobile, password } = req.body;
 
-        // Find user by email or mobile
         const user = await User.findOne({ emailOrMobile });
         if (!user) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Compare incoming password with stored hashed password
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid credentials' });
         }
 
-        // Generate JWT Token
         const token = jwt.sign(
             { userId: user._id, username: user.username }, 
             process.env.JWT_SECRET, 
@@ -161,24 +136,17 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-// 4. Health check endpoint 
 app.get("/health", (req, res) => {
   res.status(200).send("PeerJS Server & API are healthy and running!");
 });
 
-
-// ==========================================
-// SERVER & PEERJS INITIALIZATION
-// ==========================================
 const server = app.listen(PORT, () => {
   console.log(`✅ Server running on port ${PORT}`);
 });
 
-// Initialize the PeerJS server
 const peerServer = ExpressPeerServer(server, {
   debug: true,
   path: "/myapp", 
 });
 
-// Mount the PeerJS server to the root route (Keep this at the bottom!)
 app.use("/", peerServer);

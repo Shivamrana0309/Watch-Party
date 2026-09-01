@@ -233,27 +233,34 @@ export default function WatchPartyRoomRefactored() {
         
         {/* Left: Buttons + YouTube URL */}
         <div style={{ flex: 2, display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <button className="btn-join active">
+          <div className="action-area" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'nowrap', width: '100%' }}>
+            <button className="btn-join active" style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
                 <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
               </svg>
               JOIN A PARTY
             </button>
-            <button className="btn-join" onClick={() => navigate('/local-sync')}>
+            <button className="btn-join" onClick={() => navigate('/local-sync')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
               </svg>
               SYNC LOCAL VIDEO
             </button>
-            <button className="btn-join" onClick={() => navigate('/screen-share')}>
+            <button className="btn-join" onClick={() => navigate('/screen-share')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
                 <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
                 <line x1="8" y1="21" x2="16" y2="21"></line>
                 <line x1="12" y1="17" x2="12" y2="21"></line>
               </svg>
               SHARE SCREEN
+            </button>
+            <button className="btn-join" onClick={() => navigate('/watch-party')} style={{ flex: 1, whiteSpace: 'nowrap', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '0.65rem 0.5rem' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+              </svg>
+              WEBRTC PARTY
             </button>
           </div>
           <form onSubmit={handleUrlSubmit} className="watch-party-form" style={{ margin: 0, padding: 0 }}>
