@@ -6,12 +6,12 @@ import {
   Play,
   Pause,
 } from "lucide-react";
-import useLocalVideoParty from "./hooks/useLocalVideoParty";
-import { useCallContext } from "./context/CallContext";
+import useLocalVideoParty from "../hooks/useLocalVideoParty";
+import { useCallContext } from "../context/CallContext";
 import { useNavigate } from "react-router-dom";
-import RoomHeader from "./components/RoomHeader";
-import IncomingCallModal from "./components/IncomingCallModal";
-import DraggableVideoFeeds from "./components/DraggableVideoFeeds";
+import RoomHeader from "../components/RoomHeader";
+import IncomingCallModal from "../components/IncomingCallModal";
+import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 export default function LocalSyncRoom() {
   const navigate = useNavigate();

@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 
 import "./LandingPage.css"; // Ensure btn styles are available
-import RoomHeader from "./components/RoomHeader";
-import DraggableVideoFeeds from "./components/DraggableVideoFeeds";
+import RoomHeader from "../components/RoomHeader";
+import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 export default function OfflineRoom() {
   const navigate = useNavigate();

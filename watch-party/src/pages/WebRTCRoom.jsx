@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FolderOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useCallContext } from './context/CallContext';
-import RoomHeader from './components/RoomHeader';
-import IncomingCallModal from './components/IncomingCallModal';
-import DraggableVideoFeeds from './components/DraggableVideoFeeds';
-import useWebRTCStreamer from './hooks/useWebRTCStreamer';
-import VideoPlayerControls from './components/VideoPlayerControls';
+import { useCallContext } from '../context/CallContext';
+import RoomHeader from '../components/RoomHeader';
+import IncomingCallModal from '../components/IncomingCallModal';
+import DraggableVideoFeeds from '../components/DraggableVideoFeeds';
+import useWebRTCStreamer from '../hooks/useWebRTCStreamer';
+import VideoPlayerControls from '../components/VideoPlayerControls';
 
 export default function WebRTCRoom() {
   const navigate = useNavigate();

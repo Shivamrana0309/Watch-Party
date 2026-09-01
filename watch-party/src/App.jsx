@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, useNavigate } from 'react-router-dom';
-import OfflineRoom from './OfflineRoom';
-import YouTubeRoom from './YouTubeRoom';
-import ScreenShareRoom from './ScreenShareRoom';
-import LocalSyncRoom from './LocalSyncRoom'; 
-import WebRTCRoom from './WebRTCRoom';
-import LandingPage from './LandingPage';
-import LoginPage from './LoginPage';
-import SignupPage from './SignupPage';
+import OfflineRoom from './pages/OfflineRoom';
+import YouTubeRoom from './pages/YouTubeRoom';
+import ScreenShareRoom from './pages/ScreenShareRoom';
+import LocalSyncRoom from './pages/LocalSyncRoom'; 
+import WebRTCRoom from './pages/WebRTCRoom';
+import LandingPage from './pages/LandingPage';
+import LoginPage from './pages/LoginPage';
+import SignupPage from './pages/SignupPage';
 import { CallProvider } from './context/CallContext';
 import { Outlet } from 'react-router-dom';
 

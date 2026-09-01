@@ -5,12 +5,12 @@ import {
   Minimize,
   Link,
 } from "lucide-react";
-import useWatchPartyVideo from "./hooks/useWatchPartyVideo";
-import { useCallContext } from "./context/CallContext";
+import useWatchPartyVideo from "../hooks/useWatchPartyVideo";
+import { useCallContext } from "../context/CallContext";
 import { useNavigate } from "react-router-dom";
-import RoomHeader from "./components/RoomHeader";
-import IncomingCallModal from "./components/IncomingCallModal";
-import DraggableVideoFeeds from "./components/DraggableVideoFeeds";
+import RoomHeader from "../components/RoomHeader";
+import IncomingCallModal from "../components/IncomingCallModal";
+import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 const EXTRA_DARK_CSS = `
   body.dark-mode .load-video-btn {

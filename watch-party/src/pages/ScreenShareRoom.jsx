@@ -5,11 +5,11 @@ import {
   MonitorUp,
   MonitorOff,
 } from "lucide-react";
-import { useCallContext } from "./context/CallContext";
+import { useCallContext } from "../context/CallContext";
 import { useNavigate } from "react-router-dom";
-import RoomHeader from "./components/RoomHeader";
-import IncomingCallModal from "./components/IncomingCallModal";
-import DraggableVideoFeeds from "./components/DraggableVideoFeeds";
+import RoomHeader from "../components/RoomHeader";
+import IncomingCallModal from "../components/IncomingCallModal";
+import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 export default function ScreenShareRoom() {
   const navigate = useNavigate();
