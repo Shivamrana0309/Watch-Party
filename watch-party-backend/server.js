@@ -18,9 +18,9 @@ mongoose.connect(process.env.MONGODB_URI)
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 app.get("/api/turn-credentials", (req, res) => {
-  const username = process.env.TURN_USERNAME || "watchparty";
-  const credential = process.env.TURN_CREDENTIAL || "SuperSecretPass123";
-  const turnIp = process.env.TURN_IP || "20.197.58.178";
+  const username = process.env.TURN_USERNAME;
+  const credential = process.env.TURN_CREDENTIAL;
+  const turnIp = process.env.TURN_IP;
 
   res.json({
     iceServers: [

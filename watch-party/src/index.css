@@ -6,6 +6,8 @@
 
 .watch-party-room {
 	width: 100%;
+	min-height: 100vh;
+	background-color: #ffffff;
 	display: flex;
 	flex-direction: column;
 	align-items: center;

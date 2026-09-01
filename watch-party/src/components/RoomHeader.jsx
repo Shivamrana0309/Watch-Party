@@ -145,11 +145,11 @@ export default function RoomHeader({
     <>
       <style>{`
         body.dark-mode {
-          background-color: #121212 !important;
+          background-color: #0a0b0f !important;
           color: #e5e5e5 !important;
         }
         body.dark-mode .watch-party-room {
-          background-color: #121212 !important;
+          background-color: #0a0b0f !important;
         }
         body.dark-mode button.btn-join, body.dark-mode .connect-btn {
           background-color: #1f2937 !important;
