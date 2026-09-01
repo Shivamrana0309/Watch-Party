@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import YouTube from "react-youtube";
 import {
   Mic,
@@ -12,7 +13,8 @@ import "./LandingPage.css"; // Ensure btn styles are available
 import RoomHeader from "./components/RoomHeader";
 import DraggableVideoFeeds from "./components/DraggableVideoFeeds";
 
-export default function WatchPartyRoomOffline() {
+export default function OfflineRoom() {
+  const navigate = useNavigate();
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const user1Ref = useRef(null);
@@ -64,10 +66,7 @@ export default function WatchPartyRoomOffline() {
     setFriendId("");
   };
 
-  // Offline uses window.location.href for navigation (hard reload)
-  const offlineNavigate = (path) => {
-    window.location.href = path;
-  };
+
 
   const EXTRA_DARK_CSS = `
     body.dark-mode .load-video-btn {
@@ -85,8 +84,8 @@ export default function WatchPartyRoomOffline() {
   return (
     <div className="watch-party-room">
       <RoomHeader
-        activeTab="party"
-        navigate={offlineNavigate}
+        activeTab="offline"
+        navigate={navigate}
         peerId={displayedRoomId}
         isConnected={isConnected}
         activeRoomId={activeRoomId}

@@ -1,21 +1,33 @@
 import { useRef, useState, useEffect } from "react";
+import YouTube from "react-youtube";
 import {
   Maximize,
   Minimize,
-  FolderOpen,
-  Play,
-  Pause,
+  Link,
 } from "lucide-react";
-import useLocalVideoParty from "./hooks/useLocalVideoParty";
+import useWatchPartyVideo from "./hooks/useWatchPartyVideo";
 import { useCallContext } from "./context/CallContext";
 import { useNavigate } from "react-router-dom";
 import RoomHeader from "./components/RoomHeader";
 import IncomingCallModal from "./components/IncomingCallModal";
 import DraggableVideoFeeds from "./components/DraggableVideoFeeds";
 
-export default function LocalVideoPartyRoom() {
+const EXTRA_DARK_CSS = `
+  body.dark-mode .load-video-btn {
+    background-color: #1f2937 !important;
+    color: #e5e5e5 !important;
+    border-color: #374151 !important;
+  }
+  body.dark-mode .url-input {
+    background-color: #1f2937 !important;
+    color: #e5e5e5 !important;
+    border-color: #374151 !important;
+  }
+`;
+
+export default function YouTubeRoom() {
   const navigate = useNavigate();
-  const videoPlayerRef = useRef(null);
+  const playerRef = useRef(null);
   const containerRef = useRef(null);
   const user1Ref = useRef(null);
   const user2Ref = useRef(null);
@@ -50,22 +62,18 @@ export default function LocalVideoPartyRoom() {
     remoteVideoDOM,
   } = useCallContext();
 
-  // Notice the updated destructured variables here to power the custom controls
   const {
-    videoSrc,
-    fileName,
-    peerFileName,
+    videoId,
+    inputUrl,
+    setInputUrl,
     isFullscreen,
-    isPlaying,
-    currentTime,
-    duration,
-    handleFileSelect,
     handleReceiveData,
-    togglePlayPause,
-    handleSeek,
+    handleUrlSubmit,
+    handlePlay,
+    handlePause,
     toggleFullscreen,
-  } = useLocalVideoParty({
-    videoRef: videoPlayerRef,
+  } = useWatchPartyVideo({
+    playerRef,
     dataConnRef,
     containerRef,
   });
@@ -127,18 +135,10 @@ export default function LocalVideoPartyRoom() {
     };
   }, [localStream, user1Media.mic]);
 
-  // Helper to format seconds into M:SS
-  const formatTime = (timeInSeconds) => {
-    if (isNaN(timeInSeconds)) return "0:00";
-    const m = Math.floor(timeInSeconds / 60);
-    const s = Math.floor(timeInSeconds % 60).toString().padStart(2, '0');
-    return `${m}:${s}`;
-  };
-
   return (
     <div className="watch-party-room">
       <RoomHeader
-        activeTab="local-sync"
+        activeTab="party"
         navigate={navigate}
         peerId={peerId}
         isConnected={isConnected}
@@ -148,26 +148,26 @@ export default function LocalVideoPartyRoom() {
         callFriend={callFriend}
         leaveCall={leaveCall}
         callStatus={callStatus}
+        extraDarkModeCSS={EXTRA_DARK_CSS}
         customActionWidget={
-          <div style={{ display: 'flex', gap: '1rem', margin: 0, height: '52px', alignItems: 'center' }}>
-            <label className="btn btn-join" style={{ 
-              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "0.5rem", 
-              fontSize: '0.85rem', padding: '0.65rem 1.25rem', border: '1px solid #dbeafe', backgroundColor: '#eff6ff', boxShadow: '0 1px 2px rgba(0,0,0,0.06)', margin: 0, height: '100%'
-            }}>
-              <FolderOpen size={16} />
-              UPLOAD VIDEO
-              <input type="file" accept="video/*" onChange={handleFileSelect} style={{ display: "none" }} />
-            </label>
-
-            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", height: '100%', marginLeft: '0.5rem' }}>
-              <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "#475569", whiteSpace: "nowrap", flex: 1 }}>
-                <strong>Your File:</strong> &nbsp;{fileName || "None"}
+          <form onSubmit={handleUrlSubmit} className="watch-party-form" style={{ margin: 0, padding: 0 }}>
+            <div className="url-input-wrap">
+              <div className="url-input-icon">
+                <Link size={20} className="url-input-icon-svg" />
               </div>
-              <div style={{ display: "flex", alignItems: "center", fontSize: "0.85rem", color: "#16a34a", whiteSpace: "nowrap", flex: 1 }}>
-                <strong>Friend's File:</strong> &nbsp;{peerFileName || "None"}
-              </div>
+              <input
+                type="text"
+                placeholder="Paste YouTube URL here..."
+                value={inputUrl}
+                onChange={(e) => setInputUrl(e.target.value)}
+                className="url-input"
+                style={{ height: '52px' }}
+              />
             </div>
-          </div>
+            <button type="submit" className="load-video-btn" style={{ height: '52px' }}>
+              Load Video
+            </button>
+          </form>
         }
       />
 
@@ -177,87 +177,35 @@ export default function LocalVideoPartyRoom() {
         rejectCall={rejectCall}
       />
 
-      {/* Main Player & Draggable Feeds */}
       <div
         ref={containerRef}
         className={isFullscreen ? "video-shell is-fullscreen" : "video-shell"}
       >
         <div className={isFullscreen ? "player-panel is-fullscreen" : "player-panel"}>
-          <div
-            className="local-video-host"
-            style={{ width: "100%", height: "100%", backgroundColor: '#000', position: "relative" }}
-          >
-            {videoSrc ? (
-              <video
-                ref={videoPlayerRef}
-                src={videoSrc}
-                playsInline
-                onClick={togglePlayPause}
-                style={{ width: "100%", height: "100%", objectFit: "contain", cursor: "pointer" }}
-              />
-            ) : (
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  height: "100%",
-                  color: "#9ca3af",
-                  flexDirection: "column",
-                  gap: "0.5rem",
-                }}
-              >
-                <FolderOpen size={48} />
-                <p>Please select a local video file above to start watching.</p>
-              </div>
-            )}
+          <div className="youtube-host">
+            <YouTube
+              videoId={videoId}
+              ref={playerRef}
+              opts={{
+                width: "100%",
+                height: "100%",
+                playerVars: { autoplay: 0, modestbranding: 1, rel: 0, fs: 0 },
+              }}
+              onPlay={handlePlay}
+              onPause={handlePause}
+              className="youtube-iframe"
+              iframeClassName="youtube-iframe"
+            />
           </div>
-
-          {/* CUSTOM SHARED CONTROLS OVERLAY */}
-          <div 
-            className="player-controls-overlay" 
-            style={{ 
-              display: "flex", 
-              justifyContent: "space-between", 
-              alignItems: "center",
-              gap: "1.5rem",
-              background: "linear-gradient(to top, rgba(0,0,0,0.9), transparent)"
-            }}
-          >
-            <div className="controls-click-target" style={{ display: "flex", alignItems: "center", gap: "1rem", flex: 1 }}>
-              
-              <button 
-                onClick={togglePlayPause} 
-                style={{ background: "transparent", border: "none", cursor: "pointer", color: "white", display: "flex" }}
-                disabled={!videoSrc}
-              >
-                {isPlaying ? <Pause size={28} fill="white" /> : <Play size={28} fill="white" />}
-              </button>
-
-              <span style={{ color: "white", fontSize: "0.875rem", fontFamily: "monospace", minWidth: "80px" }}>
-                {formatTime(currentTime)} / {formatTime(duration)}
-              </span>
-
-              <input 
-                type="range"
-                min="0"
-                max={duration || 100}
-                value={currentTime}
-                onChange={(e) => handleSeek(Number(e.target.value))}
-                disabled={!videoSrc}
-                style={{ flex: 1, cursor: "pointer", height: "4px", accentColor: "#2563eb" }}
-              />
-            </div>
-
+          <div className="player-controls-overlay">
             <div className="controls-click-target">
-              <button onClick={toggleFullscreen} className="fullscreen-toggle" style={{ background: "transparent", border: "none", display: "flex" }}>
+              <button onClick={toggleFullscreen} className="fullscreen-toggle">
                 {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
               </button>
             </div>
           </div>
         </div>
 
-        {/* Floating / Column Cameras */}
         <DraggableVideoFeeds
           isFullscreen={isFullscreen}
           user1Ref={user1Ref}

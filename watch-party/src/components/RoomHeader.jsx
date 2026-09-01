@@ -97,7 +97,7 @@ export default function RoomHeader({
   const navButtons = [
     {
       key: 'party',
-      label: 'JOIN A PARTY',
+      label: 'YOUTUBE',
       path: '/party',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
@@ -108,7 +108,7 @@ export default function RoomHeader({
     },
     {
       key: 'local-sync',
-      label: 'SYNC LOCAL VIDEO',
+      label: 'SYNC VIDEO',
       path: '/local-sync',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
@@ -130,7 +130,7 @@ export default function RoomHeader({
     },
     {
       key: 'watch-party',
-      label: 'WEBRTC PARTY',
+      label: 'STREAM VIDEO',
       path: '/watch-party',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
