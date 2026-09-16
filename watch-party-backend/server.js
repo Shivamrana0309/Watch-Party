@@ -6,6 +6,7 @@ const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { body, validationResult } = require('express-validator');
+const rateLimit = require('express-rate-limit');
 
 const User = require('./models/User'); 
 const app = express();
@@ -83,6 +84,21 @@ app.get("/api/turn-credentials", authenticateToken, (req, res) => {
     ],
   });
 });
+
+// CRITICAL for Render deployments: Trust the first proxy to get the real client IP
+app.set('trust proxy', 1);
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 15,
+  message: { message: "Too many attempts from this IP, please try again after 15 minutes" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/login', authLimiter);
+app.use('/api/register', authLimiter);
+
 
 app.post('/api/register', [
     // 1. Validate and sanitize inputs
