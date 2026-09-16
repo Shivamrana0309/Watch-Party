@@ -9,7 +9,29 @@ const jwt = require("jsonwebtoken");
 const User = require('./models/User'); 
 const app = express();
 
-app.use(cors());
+
+const allowedOrigins = [
+  'http://localhost:5173', // Local frontend development
+  'https://watch-party-opal-pi.vercel.app' // Production frontend deployment
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    // or if the origin is in our allowed list
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true, // Crucial if your app uses cookies, sessions, or specific Authorization headers
+  optionsSuccessStatus: 200 // Some legacy browsers choke on 204
+};
+
+app.use(cors(corsOptions));
+
+// app.use(cors());
 app.use(express.json()); 
 
 const PORT = process.env.PORT || 9000;
@@ -17,7 +39,24 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ Connected to MongoDB successfully'))
   .catch((err) => console.error('❌ MongoDB connection error:', err));
 
-app.get("/api/turn-credentials", (req, res) => {
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid or expired token" });
+    }
+    req.user = user;
+    next();
+  });
+};
+
+app.get("/api/turn-credentials", authenticateToken, (req, res) => {
   const username = process.env.TURN_USERNAME;
   const credential = process.env.TURN_CREDENTIAL;
   const turnIp = process.env.TURN_IP;
@@ -75,22 +114,6 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-
-  if (!token) {
-    return res.status(401).json({ message: "No token provided" });
-  }
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) {
-      return res.status(403).json({ message: "Invalid or expired token" });
-    }
-    req.user = user;
-    next();
-  });
-};
 
 app.get('/api/verify', authenticateToken, async (req, res) => {
   try {

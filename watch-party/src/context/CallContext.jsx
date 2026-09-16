@@ -144,7 +144,19 @@ export const CallProvider = ({ children }) => {
         myStream = stream;
         setLocalStream(myStream);
 
-        const res = await fetch("https://watch-party-74e5.onrender.com/api/turn-credentials");
+        const token = localStorage.getItem("token");
+        const res = await fetch("https://watch-party-74e5.onrender.com/api/turn-credentials", {
+          headers: {
+            "Authorization": token ? `Bearer ${token}` : ""
+          }
+        });
+
+        if (res.status === 401 || res.status === 403) {
+          console.error("Unauthorized to fetch TURN credentials. Redirecting to login.");
+          navigate("/login");
+          return;
+        }
+
         const turnData = await res.json();
         const freshId = generatePeerId();
 
