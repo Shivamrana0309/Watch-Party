@@ -5,6 +5,7 @@ const cors = require("cors");
 const mongoose = require("mongoose");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const { body, validationResult } = require('express-validator');
 
 const User = require('./models/User'); 
 const app = express();
@@ -83,7 +84,35 @@ app.get("/api/turn-credentials", authenticateToken, (req, res) => {
   });
 });
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', [
+    // 1. Validate and sanitize inputs
+    body('name')
+        .trim()
+        .isLength({ min: 2, max: 50 }).withMessage('Name must be between 2 and 50 characters')
+        .escape(), // Converts HTML tags to safe characters (e.g., < to &lt;)
+    
+    body('username')
+        .trim()
+        .isLength({ min: 3, max: 30 }).withMessage('Username must be between 3 and 30 characters')
+        .isAlphanumeric().withMessage('Username must only contain letters and numbers')
+        .escape(),
+    
+    body('emailOrMobile')
+        .trim()
+        .notEmpty().withMessage('Email or Mobile is required')
+        // Note: If you accept BOTH email and mobile, you might need custom logic here, 
+        // but typically you'd enforce a valid email format if it includes an '@'
+        .escape(),
+    
+    body('password')
+        .isLength({ min: 8 }).withMessage('Password must be at least 8 characters long')
+        // Do NOT trim or escape passwords! Users might intentionally use spaces or special characters like '<'
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         const { name, username, emailOrMobile, password } = req.body;
 
@@ -131,7 +160,15 @@ app.get('/api/verify', authenticateToken, async (req, res) => {
   }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', [
+    body('emailOrMobile').trim().notEmpty().escape(),
+    body('password').notEmpty()
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+    }
+
     try {
         const { emailOrMobile, password } = req.body;
 
