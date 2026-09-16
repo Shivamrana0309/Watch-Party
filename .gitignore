@@ -1,0 +1,4 @@
+# Ignore all environment files anywhere in the project
+.env
+.env.*
+!.env.example
