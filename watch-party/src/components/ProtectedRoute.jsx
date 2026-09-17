@@ -23,6 +23,10 @@ export default function ProtectedRoute() {
         });
 
         if (response.ok) {
+          const data = await response.json();
+          if (data.newToken) {
+            localStorage.setItem('token', data.newToken);
+          }
           setIsAuthenticated(true);
         } else {
           localStorage.removeItem('token');

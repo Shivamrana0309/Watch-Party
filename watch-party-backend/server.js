@@ -162,11 +162,22 @@ app.post('/api/register', [
 
 app.get('/api/verify', authenticateToken, async (req, res) => {
   try {
+    const timeLeft = req.user.exp - Math.floor(Date.now() / 1000);
+    let newToken = undefined;
+
     // If it's a guest token, just return it without a database check
     if (req.user.role === 'guest') {
+        if (timeLeft < 900) { // Less than 15 minutes remaining
+            newToken = jwt.sign(
+                { userId: 'guest_id', username: req.user.username, role: 'guest' },
+                process.env.JWT_SECRET,
+                { expiresIn: '1h' }
+            );
+        }
         return res.status(200).json({
             valid: true,
-            user: req.user
+            user: req.user,
+            ...(newToken && { newToken })
         });
     }
 
@@ -174,9 +185,19 @@ app.get('/api/verify', authenticateToken, async (req, res) => {
     if (!user) {
         return res.status(404).json({ valid: false, message: "User not found" });
     }
+
+    if (timeLeft < 7200) { // Less than 2 hours remaining
+        newToken = jwt.sign(
+            { userId: user._id, username: user.username }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '24h' }
+        );
+    }
+
     res.status(200).json({ 
       valid: true, 
-      user 
+      user,
+      ...(newToken && { newToken })
     });
   } catch (error) {
     console.error("Verification error:", error);
