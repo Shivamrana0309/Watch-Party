@@ -42,11 +42,11 @@ function AppRoutes() {
       <Route path="/signup" element={<SignupPage onSignupSuccess={() => navigate('/login')} onNavigateLogin={() => navigate('/login')} />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<RoomLayout />}>
-          <Route path="/room" element={<div className="min-h-screen bg-white py-10"><OfflineRoom /></div>} />
-          <Route path="/party" element={<div className="min-h-screen bg-white py-10"><YouTubeRoom /></div>} />
-          <Route path="/screen-share" element={<div className="min-h-screen bg-white py-10"><ScreenShareRoom /></div>} />
-          <Route path="/local-sync" element={<div className="min-h-screen bg-white py-10"><LocalSyncRoom /></div>} />
-          <Route path="/watch-party" element={<div className="min-h-screen bg-gray-50 py-10"><WebRTCRoom /></div>} />
+          <Route path="/room/:roomId?" element={<div className="min-h-screen bg-white py-10"><OfflineRoom /></div>} />
+          <Route path="/party/:roomId?" element={<div className="min-h-screen bg-white py-10"><YouTubeRoom /></div>} />
+          <Route path="/screen-share/:roomId?" element={<div className="min-h-screen bg-white py-10"><ScreenShareRoom /></div>} />
+          <Route path="/local-sync/:roomId?" element={<div className="min-h-screen bg-white py-10"><LocalSyncRoom /></div>} />
+          <Route path="/watch-party/:roomId?" element={<div className="min-h-screen bg-gray-50 py-10"><WebRTCRoom /></div>} />
         </Route>
       </Route>
     </Routes>

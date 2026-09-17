@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './LoginPage.css';
 
 export default function LoginPage({ onLoginSuccess, onNavigateSignup }) {
+    const navigate = useNavigate();
     const [credentials, setCredentials] = useState({ emailOrMobile: '', password: '' });
     const [showPassword, setShowPassword] = useState(false); // Added toggle state
+    const [roomCode, setRoomCode] = useState('');
 
     const handleChange = (e) => {
         setCredentials({ ...credentials, [e.target.id]: e.target.value });
@@ -13,7 +16,7 @@ export default function LoginPage({ onLoginSuccess, onNavigateSignup }) {
         e.preventDefault();
         
         try {
-            const response = await fetch('https://watch-party-74e5.onrender.com/api/login', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(credentials)
@@ -28,6 +31,33 @@ export default function LoginPage({ onLoginSuccess, onNavigateSignup }) {
             }
         } catch (error) {
             console.error("Login error:", error);
+            alert("Server error. Make sure your backend is running.");
+        }
+    };
+
+    const handleGuestLogin = async (e) => {
+        e.preventDefault();
+        
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/guest-login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.token); // Save JWT token
+                
+                if (roomCode.trim()) {
+                    navigate(`/room/${roomCode.trim()}`);
+                } else {
+                    onLoginSuccess(); // Default authenticated view
+                }
+            } else {
+                alert("Failed to login as guest.");
+            }
+        } catch (error) {
+            console.error("Guest login error:", error);
             alert("Server error. Make sure your backend is running.");
         }
     };
@@ -104,9 +134,11 @@ export default function LoginPage({ onLoginSuccess, onNavigateSignup }) {
                             placeholder="Enter 6-digit Room Code" 
                             maxLength="6" 
                             style={{ textAlign: 'center', letterSpacing: '2px', fontWeight: 'bold' }} 
+                            value={roomCode}
+                            onChange={(e) => setRoomCode(e.target.value)}
                         />
                     </div>
-                    <button type="button" className="login-btn btn-secondary" onClick={onLoginSuccess}>
+                    <button type="button" className="login-btn btn-secondary" onClick={handleGuestLogin}>
                         Join as Guest
                     </button>
                 </form>

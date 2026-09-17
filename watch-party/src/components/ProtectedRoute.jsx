@@ -14,7 +14,7 @@ export default function ProtectedRoute() {
       }
 
       try {
-        const response = await fetch('https://watch-party-74e5.onrender.com/api/verify', {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/verify`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,

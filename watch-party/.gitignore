@@ -11,6 +11,8 @@ artifacts
 document
 node_modules
 dist
+.env.development
+.env.render
 dist-ssr
 *.local
 

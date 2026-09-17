@@ -1,5 +1,5 @@
-import { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRef, useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import YouTube from "react-youtube";
 import {
   Mic,
@@ -15,6 +15,7 @@ import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 export default function OfflineRoom() {
   const navigate = useNavigate();
+  const { roomId } = useParams();
   const playerRef = useRef(null);
   const containerRef = useRef(null);
   const user1Ref = useRef(null);
@@ -30,7 +31,11 @@ export default function OfflineRoom() {
   const [user1Media] = useState({ mic: false, cam: false });
   const [user2Media] = useState({ mic: true, cam: true });
 
-  const [friendId, setFriendId] = useState("");
+  const [friendId, setFriendId] = useState(roomId || "");
+
+  useEffect(() => {
+    if (roomId) setFriendId(roomId);
+  }, [roomId]);
   const [isConnected, setIsConnected] = useState(false);
   const activeRoomId = "OFFLINE-MODE";
   const displayedRoomId = "YOUR-ID-123";

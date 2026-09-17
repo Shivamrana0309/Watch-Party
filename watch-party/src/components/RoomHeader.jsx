@@ -55,7 +55,7 @@ export default function RoomHeader({
       const token = localStorage.getItem('token');
       if (!token) return;
       try {
-        const res = await fetch('https://watch-party-74e5.onrender.com/api/verify', {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/verify`, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {

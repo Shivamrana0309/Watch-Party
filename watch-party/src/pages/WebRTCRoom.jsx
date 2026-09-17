@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FolderOpen } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useCallContext } from '../context/CallContext';
 import RoomHeader from '../components/RoomHeader';
 import IncomingCallModal from '../components/IncomingCallModal';
@@ -10,6 +10,7 @@ import VideoPlayerControls from '../components/VideoPlayerControls';
 
 export default function WebRTCRoom() {
   const navigate = useNavigate();
+  const { roomId } = useParams();
 
   // ── Pull everything from the global CallContext ──
   const {
@@ -22,6 +23,12 @@ export default function WebRTCRoom() {
     sendData, subscribeToData,
     activeRoomId
   } = useCallContext();
+
+  useEffect(() => {
+    if (roomId) {
+      setFriendId(roomId);
+    }
+  }, [roomId, setFriendId]);
 
   const { 
     videoRef, videoUrlRef, fileName, isStreamer, currentTime, duration, 

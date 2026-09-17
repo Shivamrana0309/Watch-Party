@@ -162,6 +162,14 @@ app.post('/api/register', [
 
 app.get('/api/verify', authenticateToken, async (req, res) => {
   try {
+    // If it's a guest token, just return it without a database check
+    if (req.user.role === 'guest') {
+        return res.status(200).json({
+            valid: true,
+            user: req.user
+        });
+    }
+
     const user = await User.findById(req.user.userId).select('-password');
     if (!user) {
         return res.status(404).json({ valid: false, message: "User not found" });
@@ -209,6 +217,27 @@ app.post('/api/login', [
     } catch (error) {
         console.error("Login Error:", error);
         res.status(500).json({ message: 'Server error during login' });
+    }
+});
+
+app.post('/api/guest-login', (req, res) => {
+    try {
+        const generatedUsername = `Guest_${Math.floor(Math.random() * 10000)}`;
+        
+        const token = jwt.sign(
+            { userId: 'guest_id', username: generatedUsername, role: 'guest' }, 
+            process.env.JWT_SECRET, 
+            { expiresIn: '1h' }
+        );
+
+        res.status(200).json({ 
+            message: 'Guest logged in successfully',
+            token,
+            user: { userId: 'guest_id', username: generatedUsername, role: 'guest' }
+        });
+    } catch (error) {
+        console.error("Guest Login Error:", error);
+        res.status(500).json({ message: 'Server error during guest login' });
     }
 });
 

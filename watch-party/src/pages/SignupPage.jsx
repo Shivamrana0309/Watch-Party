@@ -19,7 +19,7 @@ export default function SignupPage({ onSignupSuccess, onNavigateLogin }) {
         e.preventDefault();
         
         try {
-            const response = await fetch('https://watch-party-74e5.onrender.com/api/register', {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/api/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(formData)

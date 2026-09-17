@@ -145,7 +145,7 @@ export const CallProvider = ({ children }) => {
         setLocalStream(myStream);
 
         const token = localStorage.getItem("token");
-        const res = await fetch("https://watch-party-74e5.onrender.com/api/turn-credentials", {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/turn-credentials`, {
           headers: {
             "Authorization": token ? `Bearer ${token}` : ""
           }
@@ -160,11 +160,12 @@ export const CallProvider = ({ children }) => {
         const turnData = await res.json();
         const freshId = generatePeerId();
 
+        const backendUrl = new URL(import.meta.env.VITE_API_URL);
         peer = new Peer(freshId, {
-          host: "watch-party-74e5.onrender.com",
-          port: 443,
+          host: backendUrl.hostname,
+          port: backendUrl.port || (backendUrl.protocol === 'https:' ? 443 : 80),
           path: "/myapp",
-          secure: true,
+          secure: backendUrl.protocol === 'https:',
           config: { iceServers: turnData.iceServers },
         });
 
