@@ -37,9 +37,19 @@ app.use(cors(corsOptions));
 app.use(express.json()); 
 
 const PORT = process.env.PORT || 9000;
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
   .then(() => console.log('✅ Connected to MongoDB successfully'))
   .catch((err) => console.error('❌ MongoDB connection error:', err));
+
+mongoose.connection.on('error', (err) => {
+    console.error('❌ Mongoose connection error:', err);
+});
+mongoose.connection.on('disconnected', () => {
+    console.warn('⚠️ Mongoose disconnected. Awaiting reconnection...');
+});
+mongoose.connection.on('reconnected', () => {
+    console.log('✅ Mongoose reconnected successfully.');
+});
 
 const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
@@ -263,7 +273,19 @@ app.post('/api/guest-login', (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.status(200).send("PeerJS Server & API are healthy and running!");
+  if (mongoose.connection.readyState === 1) {
+    res.status(200).json({ 
+      status: "OK", 
+      message: "PeerJS Server & API are healthy and running!", 
+      database: "connected" 
+    });
+  } else {
+    res.status(503).json({ 
+      status: "ERROR", 
+      message: "API is running, but database connection is down.", 
+      database: "disconnected" 
+    });
+  }
 });
 
 const server = app.listen(PORT, () => {
