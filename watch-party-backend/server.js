@@ -297,4 +297,5 @@ const peerServer = ExpressPeerServer(server, {
   path: "/myapp", 
 });
 
-app.use("/", peerServer);
+// app.use("/", peerServer);
+app.use("/peerjs", peerServer);

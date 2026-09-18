@@ -164,7 +164,7 @@ export const CallProvider = ({ children }) => {
         peer = new Peer(freshId, {
           host: backendUrl.hostname,
           port: backendUrl.port || (backendUrl.protocol === 'https:' ? 443 : 80),
-          path: "/myapp",
+          path: "/peerjs/myapp",
           secure: backendUrl.protocol === 'https:',
           config: { iceServers: turnData.iceServers },
         });
