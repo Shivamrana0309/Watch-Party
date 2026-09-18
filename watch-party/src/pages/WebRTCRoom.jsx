@@ -16,7 +16,7 @@ export default function WebRTCRoom() {
   const {
     peerId, friendId, setFriendId,
     localStream, remoteStream,
-    remoteMovieStream, startMovieShare, stopMovieShare,
+    remoteMovieStream, startMovieShare, stopMovieShare, movieCallRef,
     callFriend, acceptCall, rejectCall, leaveCall,
     isConnected, callStatus, incomingCall,
     user1Media, user2Media, toggleLocalMic, toggleLocalCam,
@@ -36,7 +36,7 @@ export default function WebRTCRoom() {
     handleTimeUpdate, handlePlayPauseEvent, handleWaiting, 
     togglePlayPause, handleSeek, formatTime, setIsScrubbing 
   } = useWebRTCStreamer({ 
-    isConnected, sendData, subscribeToData, startMovieShare, stopMovieShare 
+    isConnected, sendData, subscribeToData, startMovieShare, stopMovieShare, movieCallRef
   });
 
   // UI State

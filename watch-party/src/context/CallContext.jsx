@@ -29,6 +29,9 @@ const createDummyStream = () => {
   osc.start();
   
   const audioTrack = dest.stream.getAudioTracks()[0];
+  
+  // Close the context immediately to prevent AudioContext exhaustion (Max 6 contexts allowed by browsers)
+  audioCtx.close();
 
   return new MediaStream([videoTrack, audioTrack]);
 };
@@ -39,6 +42,7 @@ export const CallProvider = ({ children }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const isPeerNavigating = useRef(false);
+  const togglingRef = useRef(false);
 
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
@@ -295,112 +299,124 @@ export const CallProvider = ({ children }) => {
   };
 
   const toggleLocalMic = async () => {
-    const currentState = user1MediaRef.current.mic;
-    const newState = !currentState;
+    if (togglingRef.current) return;
+    togglingRef.current = true;
+    try {
+      const currentState = user1MediaRef.current.mic;
+      const newState = !currentState;
 
-    if (newState) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const newAudioTrack = stream.getAudioTracks()[0];
-        
+      if (newState) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const newAudioTrack = stream.getAudioTracks()[0];
+          
+          if (localStream) {
+            const oldTrack = localStream.getAudioTracks()[0];
+            if (oldTrack) {
+              localStream.removeTrack(oldTrack);
+              oldTrack.stop();
+            }
+            localStream.addTrack(newAudioTrack);
+          }
+
+          if (currentCallRef.current && currentCallRef.current.peerConnection) {
+            const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
+            if (sender) sender.replaceTrack(newAudioTrack).catch(e => console.error(e));
+          }
+
+          setUser1Media(prev => {
+            const updated = { ...prev, mic: true };
+            broadcastMediaState(updated);
+            return updated;
+          });
+        } catch (e) {
+          console.error("Mic permission denied", e);
+        }
+      } else {
         if (localStream) {
           const oldTrack = localStream.getAudioTracks()[0];
           if (oldTrack) {
             localStream.removeTrack(oldTrack);
             oldTrack.stop();
           }
-          localStream.addTrack(newAudioTrack);
-        }
+          const dummyStream = createDummyStream();
+          const dummyAudioTrack = dummyStream.getAudioTracks()[0];
+          localStream.addTrack(dummyAudioTrack);
 
-        if (currentCallRef.current && currentCallRef.current.peerConnection) {
-          const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
-          if (sender) sender.replaceTrack(newAudioTrack).catch(e => console.error(e));
+          if (currentCallRef.current && currentCallRef.current.peerConnection) {
+            const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
+            if (sender) sender.replaceTrack(dummyAudioTrack).catch(e => console.error(e));
+          }
         }
-
         setUser1Media(prev => {
-          const updated = { ...prev, mic: true };
+          const updated = { ...prev, mic: false };
           broadcastMediaState(updated);
           return updated;
         });
-      } catch (e) {
-        console.error("Mic permission denied", e);
       }
-    } else {
-      if (localStream) {
-        const oldTrack = localStream.getAudioTracks()[0];
-        if (oldTrack) {
-          localStream.removeTrack(oldTrack);
-          oldTrack.stop();
-        }
-        const dummyStream = createDummyStream();
-        const dummyAudioTrack = dummyStream.getAudioTracks()[0];
-        localStream.addTrack(dummyAudioTrack);
-
-        if (currentCallRef.current && currentCallRef.current.peerConnection) {
-          const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'audio');
-          if (sender) sender.replaceTrack(dummyAudioTrack).catch(e => console.error(e));
-        }
-      }
-      setUser1Media(prev => {
-        const updated = { ...prev, mic: false };
-        broadcastMediaState(updated);
-        return updated;
-      });
+    } finally {
+      togglingRef.current = false;
     }
   };
 
   const toggleLocalCam = async () => {
-    const currentState = user1MediaRef.current.cam;
-    const newState = !currentState;
+    if (togglingRef.current) return;
+    togglingRef.current = true;
+    try {
+      const currentState = user1MediaRef.current.cam;
+      const newState = !currentState;
 
-    if (newState) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 20 } } });
-        const newVideoTrack = stream.getVideoTracks()[0];
-        
+      if (newState) {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 20 } } });
+          const newVideoTrack = stream.getVideoTracks()[0];
+          
+          if (localStream) {
+            const oldTrack = localStream.getVideoTracks()[0];
+            if (oldTrack) {
+              localStream.removeTrack(oldTrack);
+              oldTrack.stop();
+            }
+            localStream.addTrack(newVideoTrack);
+          }
+
+          if (currentCallRef.current && currentCallRef.current.peerConnection) {
+            const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) sender.replaceTrack(newVideoTrack).catch(e => console.error(e));
+          }
+
+          setUser1Media(prev => {
+            const updated = { ...prev, cam: true };
+            broadcastMediaState(updated);
+            return updated;
+          });
+        } catch (e) {
+          console.error("Camera permission denied", e);
+        }
+      } else {
         if (localStream) {
           const oldTrack = localStream.getVideoTracks()[0];
           if (oldTrack) {
             localStream.removeTrack(oldTrack);
             oldTrack.stop();
           }
-          localStream.addTrack(newVideoTrack);
-        }
+          const dummyStream = createDummyStream();
+          const dummyVideoTrack = dummyStream.getVideoTracks()[0];
+          localStream.addTrack(dummyVideoTrack);
 
-        if (currentCallRef.current && currentCallRef.current.peerConnection) {
-          const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-          if (sender) sender.replaceTrack(newVideoTrack).catch(e => console.error(e));
+          if (currentCallRef.current && currentCallRef.current.peerConnection) {
+            const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
+            if (sender) sender.replaceTrack(dummyVideoTrack).catch(e => console.error(e));
+          }
         }
-
         setUser1Media(prev => {
-          const updated = { ...prev, cam: true };
+          const updated = { ...prev, cam: false };
           broadcastMediaState(updated);
           return updated;
         });
-      } catch (e) {
-        console.error("Camera permission denied", e);
       }
-    } else {
-      if (localStream) {
-        const oldTrack = localStream.getVideoTracks()[0];
-        if (oldTrack) {
-          localStream.removeTrack(oldTrack);
-          oldTrack.stop();
-        }
-        const dummyStream = createDummyStream();
-        const dummyVideoTrack = dummyStream.getVideoTracks()[0];
-        localStream.addTrack(dummyVideoTrack);
-
-        if (currentCallRef.current && currentCallRef.current.peerConnection) {
-          const sender = currentCallRef.current.peerConnection.getSenders().find(s => s.track && s.track.kind === 'video');
-          if (sender) sender.replaceTrack(dummyVideoTrack).catch(e => console.error(e));
-        }
-      }
-      setUser1Media(prev => {
-        const updated = { ...prev, cam: false };
-        broadcastMediaState(updated);
-        return updated;
-      });
+    } finally {
+      togglingRef.current = false;
     }
   };
 
@@ -516,7 +532,7 @@ export const CallProvider = ({ children }) => {
     }
   };
 
-  const leaveCall = (isRemote = false) => {
+  const leaveCall = useCallback((isRemote = false) => {
     const wasConnected = isConnectedRef.current;
     
     // Safely capture the remote ID using refs to bypass stale closures in event listeners
@@ -572,7 +588,7 @@ export const CallProvider = ({ children }) => {
     setActiveRoomId("");
     setFriendId("");
     setUser2Media({ mic: true, cam: true });
-  };
+  }, [activeRoomId, friendId, localScreenStream, localMovieStream]);
 
   // --- Route Synchronization Logic ---
   useEffect(() => {
@@ -628,6 +644,7 @@ export const CallProvider = ({ children }) => {
     toggleScreenShare,
     startMovieShare,
     stopMovieShare,
+    movieCallRef,
     callFriend,
     acceptCall,
     rejectCall,

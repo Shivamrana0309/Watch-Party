@@ -5,7 +5,8 @@ export default function useWebRTCStreamer({
   sendData,
   subscribeToData,
   startMovieShare,
-  stopMovieShare
+  stopMovieShare,
+  movieCallRef
 }) {
   const [fileName, setFileName] = useState("");
   const [isStreamer, setIsStreamer] = useState(false);
@@ -44,6 +45,9 @@ export default function useWebRTCStreamer({
       clearInterval(statsIntervalRef.current);
       statsIntervalRef.current = null;
     }
+
+    mediaElementSourceRef.current = null;
+    mediaStreamDestinationRef.current = null;
 
     setNetworkQuality('Good');
   };
@@ -268,6 +272,14 @@ export default function useWebRTCStreamer({
     streamRef.current = finalStream;
 
     startMovieShare(finalStream);
+    
+    if (movieCallRef && movieCallRef.current) {
+      const peerConnection = movieCallRef.current.peerConnection;
+      if (peerConnection) {
+        applyHighQualitySenderSettings(peerConnection);
+      }
+    }
+    
     startStatsMonitoring(finalStream, true);
   };
 
