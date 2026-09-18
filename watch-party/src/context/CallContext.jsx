@@ -4,6 +4,12 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 const CallContext = createContext(null);
 
+const VALID_SYNC_ROUTES = ["/room", "/party", "/screen-share", "/local-sync", "/watch-party"];
+const isValidSyncPath = (path) => {
+  if (!path || typeof path !== "string") return false;
+  return VALID_SYNC_ROUTES.some(route => path === route || path.startsWith(`${route}/`));
+};
+
 const createDummyStream = () => {
   const canvas = Object.assign(document.createElement("canvas"), { width: 640, height: 480 });
   const ctx = canvas.getContext("2d");
@@ -517,7 +523,9 @@ export const CallProvider = ({ children }) => {
     const remoteId = activeRoomIdRef.current || friendIdRef.current || activeRoomId || friendId;
 
     if (dataConnRef.current && dataConnRef.current.open) {
-      try { dataConnRef.current.send({ type: "CALL_LEAVE" }); } catch {}
+      if (!isRemote) {
+        try { dataConnRef.current.send({ type: "CALL_LEAVE" }); } catch {}
+      }
       dataConnRef.current.close();
       dataConnRef.current = null;
     }
@@ -578,8 +586,12 @@ export const CallProvider = ({ children }) => {
   useEffect(() => {
     const handleRouteData = (data) => {
       if (data.type === "ROUTE_CHANGE" && data.path && data.path !== location.pathname) {
-        isPeerNavigating.current = true;
-        navigate(data.path);
+        if (isValidSyncPath(data.path)) {
+          isPeerNavigating.current = true;
+          navigate(data.path);
+        } else {
+          console.warn(`Blocked unsafe route sync attempt to: ${data.path}`);
+        }
       }
     };
     
