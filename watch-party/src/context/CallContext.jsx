@@ -145,6 +145,11 @@ export const CallProvider = ({ children }) => {
         setLocalStream(myStream);
 
         const token = localStorage.getItem("token");
+        if (!token) {
+          console.warn("No token found. Redirecting to login.");
+          navigate("/login");
+          return;
+        }
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/turn-credentials`, {
           headers: {
             "Authorization": token ? `Bearer ${token}` : ""
