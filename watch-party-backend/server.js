@@ -293,7 +293,8 @@ const server = app.listen(PORT, () => {
 });
 
 const peerServer = ExpressPeerServer(server, {
-  debug: true,
+  // debug: true,
+  debug: process.env.NODE_ENV !== 'production',
   path: "/myapp", 
 });
 
