@@ -141,12 +141,12 @@ export const CallProvider = ({ children }) => {
   const remoteVideoDOM = useRef(document.createElement("video"));
 
   useEffect(() => {
-    localVideoDOM.current.autoPlay = true;
+    localVideoDOM.current.autoplay = true;
     localVideoDOM.current.playsInline = true;
     localVideoDOM.current.muted = true;
     localVideoDOM.current.style.transform = "scaleX(-1)";
 
-    remoteVideoDOM.current.autoPlay = true;
+    remoteVideoDOM.current.autoplay = true;
     remoteVideoDOM.current.playsInline = true;
   }, []);
 

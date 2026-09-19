@@ -209,6 +209,7 @@ export default function LocalSyncRoom() {
 
               <input 
                 type="range"
+                step="0.1"
                 min="0"
                 max={duration || 100}
                 value={currentTime}

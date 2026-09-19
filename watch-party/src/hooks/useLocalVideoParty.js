@@ -14,6 +14,13 @@ export default function useLocalVideoParty({ videoRef, dataConnRef, containerRef
   // Tracks our drag debouncer for smooth seeking
   const seekTimeoutRef = useRef(null);
 
+  useEffect(() => {
+    if (!videoSrc) return;
+    return () => {
+      URL.revokeObjectURL(videoSrc);
+    };
+  }, [videoSrc]);
+
   const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
