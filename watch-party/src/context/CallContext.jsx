@@ -173,62 +173,98 @@ export const CallProvider = ({ children }) => {
         }
 
         const turnData = await res.json();
-        const freshId = generatePeerId();
-
         const backendUrl = new URL(import.meta.env.VITE_API_URL);
-        peer = new Peer(freshId, {
-          host: backendUrl.hostname,
-          port: backendUrl.port || (backendUrl.protocol === 'https:' ? 443 : 80),
-          path: "/peerjs/myapp",
-          secure: backendUrl.protocol === 'https:',
-          config: { iceServers: turnData.iceServers },
-        });
 
-        peerInstance.current = peer;
+        const initializePeer = (retryCount = 0) => {
+          const freshId = generatePeerId();
+          peer = new Peer(freshId, {
+            host: backendUrl.hostname,
+            port: backendUrl.port || (backendUrl.protocol === 'https:' ? 443 : 80),
+            path: "/peerjs/myapp",
+            secure: backendUrl.protocol === 'https:',
+            config: { iceServers: turnData.iceServers },
+          });
 
-        peer.on("open", (id) => {
-          if (!isMounted) return;
-          setPeerId(id);
-        });
+          peerInstance.current = peer;
 
-        peer.on("connection", (conn) => {
-          dataConnRef.current = conn;
-          conn.on("data", (data) => {
-            if (data.type === "CALL_REQUEST") {
-              setIncomingCall({ callerId: data.callerId, conn });
-            } else {
-              handleIncomingData(data);
+          peer.on("open", (id) => {
+            if (!isMounted) return;
+            setPeerId(id);
+            setCallStatus((prev) => prev.includes("Reconnecting") ? "" : prev);
+          });
+
+          peer.on("disconnected", () => {
+            console.warn("Peer disconnected from server. Attempting to reconnect...");
+            setCallStatus("Reconnecting to server...");
+            if (peer && !peer.destroyed) {
+              setTimeout(() => {
+                if (peer && !peer.destroyed && peer.disconnected) {
+                  peer.reconnect();
+                }
+              }, 1000);
             }
           });
-        });
 
-        peer.on("call", (call) => {
-          if (call.metadata && call.metadata.type === "SCREEN_SHARE") {
-            call.answer(); 
-            call.on("stream", (screenStream) => {
-              if (isMounted) setRemoteScreenStream(screenStream);
+          peer.on("connection", (conn) => {
+            dataConnRef.current = conn;
+            conn.on("data", (data) => {
+              if (data.type === "CALL_REQUEST") {
+                setIncomingCall({ callerId: data.callerId, conn });
+              } else {
+                handleIncomingData(data);
+              }
             });
-          } else if (call.metadata && call.metadata.type === "MOVIE_SHARE") {
-            call.answer();
-            call.on("stream", (movieStream) => {
-              if (isMounted) setRemoteMovieStream(movieStream);
-            });
-          } else {
-            if (!myStream) return;
-            currentCallRef.current = call;
-            call.answer(myStream);
-            call.on("stream", (userVideoStream) => {
-              if (isMounted) setRemoteStream(userVideoStream);
-            });
-          }
-        });
+          });
 
-        peer.on("error", (err) => {
-          if (err.type === "peer-unavailable") {
-            setCallStatus("Friend is offline.");
-            setTimeout(() => setCallStatus(""), 4000);
-          }
-        });
+          peer.on("call", (call) => {
+            if (call.metadata && call.metadata.type === "SCREEN_SHARE") {
+              call.answer(); 
+              call.on("stream", (screenStream) => {
+                if (isMounted) setRemoteScreenStream(screenStream);
+              });
+            } else if (call.metadata && call.metadata.type === "MOVIE_SHARE") {
+              call.answer();
+              call.on("stream", (movieStream) => {
+                if (isMounted) setRemoteMovieStream(movieStream);
+              });
+            } else {
+              if (!myStream) return;
+              currentCallRef.current = call;
+              call.answer(myStream);
+              call.on("stream", (userVideoStream) => {
+                if (isMounted) setRemoteStream(userVideoStream);
+              });
+            }
+          });
+
+          peer.on("error", (err) => {
+            if (err.type === 'unavailable-id') {
+              const MAX_RETRIES = 3;
+              peer.destroy();
+              if (retryCount < MAX_RETRIES) {
+                console.warn(`Peer ID collision detected. Retrying (${retryCount + 1}/${MAX_RETRIES})...`);
+                initializePeer(retryCount + 1);
+              } else {
+                console.error("Failed to generate a unique Peer ID after max retries.");
+                setCallStatus("Failed to connect to the peer network.");
+                setTimeout(() => setCallStatus(""), 4000);
+              }
+            } else if (err.type === "peer-unavailable") {
+              setCallStatus("Friend is offline.");
+              setTimeout(() => setCallStatus(""), 4000);
+            } else if (err.type === "network" || err.type === "server-error") {
+              console.warn(`Peer network error: ${err.type}. Retrying connection...`);
+              setCallStatus("Network issue. Reconnecting...");
+              setTimeout(() => {
+                if (peer && !peer.destroyed && peer.disconnected) {
+                  peer.reconnect();
+                }
+              }, 3000);
+            }
+          });
+        };
+
+        initializePeer(0);
       } catch (err) {
         console.error("Initialization error:", err);
       }

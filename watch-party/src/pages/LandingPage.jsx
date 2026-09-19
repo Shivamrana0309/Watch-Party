@@ -16,10 +16,10 @@ export default function LandingPage({
           <div className="nav-left">
             <div className="logo"></div>
             <div className="nav-links">
-              <a href="#">Products</a>
-              <a href="#">App</a>
-              <a href="#">About</a>
-              <a href="#">FAQ</a>
+              <a href="#" onClick={(e) => e.preventDefault()} title="Coming soon!" style={{ cursor: 'not-allowed' }}>Products</a>
+              <a href="#" onClick={(e) => e.preventDefault()} title="Coming soon!" style={{ cursor: 'not-allowed' }}>App</a>
+              <a href="#" onClick={(e) => e.preventDefault()} title="Coming soon!" style={{ cursor: 'not-allowed' }}>About</a>
+              <a href="#" onClick={(e) => e.preventDefault()} title="Coming soon!" style={{ cursor: 'not-allowed' }}>FAQ</a>
             </div>
           </div>
           <div className="nav-right">
@@ -74,7 +74,7 @@ export default function LandingPage({
           </div>
 
           <div className="right-column">
-            <div className="bento-card blog-card">
+            <div className="bento-card blog-card" title="Coming soon!" style={{ cursor: 'not-allowed' }}>
               <div className="small-text">Streaming Community Insights</div>
               <h2>View our blog</h2>
               <div className="planet-large"></div>
@@ -85,7 +85,7 @@ export default function LandingPage({
             </div>
 
             <div className="bottom-row">
-              <div className="bento-card info-card purple-card">
+              <div className="bento-card info-card purple-card" title="Coming soon!" style={{ cursor: 'not-allowed' }}>
                 <div className="small-text">Discover<br />Our Vision</div>
                 <h2>About us</h2>
                 <svg className="icon-top-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -97,7 +97,7 @@ export default function LandingPage({
                 </svg>
               </div>
 
-              <div className="bento-card info-card green-card">
+              <div className="bento-card info-card green-card" title="Coming soon!" style={{ cursor: 'not-allowed' }}>
                 <div className="small-text">Support Team<br />On Standby</div>
                 <h2>Contact us</h2>
                 <svg className="icon-top-right" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

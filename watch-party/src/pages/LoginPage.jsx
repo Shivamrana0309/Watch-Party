@@ -122,7 +122,7 @@ export default function LoginPage({ onLoginSuccess, onNavigateSignup }) {
 
                     <div className="links">
                         <a href="#" onClick={(e) => { e.preventDefault(); onNavigateSignup(); }}>Create Account</a>
-                        <a href="#">Forgot Password?</a>
+                        <span title="Coming soon!" style={{ color: '#94a3b8', textDecoration: 'none', cursor: 'not-allowed' }}>Forgot Password?</span>
                     </div>
 
                     <div className="divider">OR</div>
