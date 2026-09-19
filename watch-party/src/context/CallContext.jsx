@@ -85,6 +85,57 @@ export const CallProvider = ({ children }) => {
   const user1MediaRef = useRef(user1Media);
   const dataListeners = useRef(new Set());
 
+  const [networkQuality, setNetworkQuality] = useState('High');
+  const statsIntervalRef = useRef(null);
+
+  useEffect(() => {
+    if (isConnected) {
+      statsIntervalRef.current = setInterval(async () => {
+        let pc = currentCallRef.current?.peerConnection;
+        
+        // If they are sharing a movie, monitor that stream instead as it is the heaviest
+        if (movieCallRef.current?.peerConnection) {
+          pc = movieCallRef.current.peerConnection;
+        } else if (screenCallRef.current?.peerConnection) {
+          pc = screenCallRef.current.peerConnection;
+        }
+
+        if (!pc) {
+          setNetworkQuality('High'); 
+          return;
+        }
+
+        try {
+          const stats = await pc.getStats();
+          let quality = 'High';
+          
+          stats.forEach((report) => {
+            if (report.type === 'inbound-rtp' && report.kind === 'video') {
+              const fractionLost = report.packetsLost / (report.packetsReceived + report.packetsLost || 1);
+              if (fractionLost > 0.05) quality = 'Low';
+              else if (fractionLost > 0.02) quality = 'Medium';
+            } else if (report.type === 'outbound-rtp' && report.kind === 'video') {
+              const fractionLost = report.packetsLost / (report.packetsSent + report.packetsLost || 1);
+              if (fractionLost > 0.05) quality = 'Low';
+              else if (fractionLost > 0.02) quality = 'Medium';
+            }
+          });
+          
+          setNetworkQuality(quality);
+        } catch (err) {
+          setNetworkQuality('High');
+        }
+      }, 3000);
+    } else {
+      if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+      setNetworkQuality('High');
+    }
+
+    return () => {
+      if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
+    };
+  }, [isConnected]);
+
   // Persistent Video DOM elements
   const localVideoDOM = useRef(document.createElement("video"));
   const remoteVideoDOM = useRef(document.createElement("video"));
@@ -693,7 +744,8 @@ export const CallProvider = ({ children }) => {
     subscribeToData,
     dataConnRef,
     localVideoDOM: localVideoDOM.current,
-    remoteVideoDOM: remoteVideoDOM.current
+    remoteVideoDOM: remoteVideoDOM.current,
+    networkQuality
   };
 
   return (

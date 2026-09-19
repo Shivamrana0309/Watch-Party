@@ -8,6 +8,7 @@ import {
   Sun,
   Moon,
 } from "lucide-react";
+import { useCallContext } from "../context/CallContext";
 
 /**
  * Shared header for all room components.
@@ -32,6 +33,8 @@ export default function RoomHeader({
   friendIdDisabled,   // explicit disabled check for connect button; defaults to !friendId.trim()
   friendIdUppercase = true, // whether to uppercase the friend ID on change
 }) {
+  const { networkQuality } = useCallContext();
+
   // ── Dark Mode ──
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme") === "dark");
 
@@ -220,6 +223,40 @@ export default function RoomHeader({
         <div className="friend-connect-panel" style={{ flex: 1, margin: 0, height: '52px', position: 'relative', display: 'flex', alignItems: 'center', boxSizing: 'border-box' }}>
           {/* Theme + Profile toggles (absolutely positioned above) */}
           <div style={{ position: 'absolute', top: '-60px', right: '0', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            {networkQuality && (
+              <div 
+                title="Network"
+                style={{
+                  width: '64px', height: '38px', borderRadius: '19px',
+                  backgroundColor: isDarkMode ? '#374151' : '#cbd5e1',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.1)'
+                }}
+              >
+                {networkQuality === 'High' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+                    <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                    <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                  </svg>
+                )}
+                {networkQuality === 'Medium' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#eab308" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+                    <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                  </svg>
+                )}
+                {networkQuality === 'Low' && (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: '20px', height: '20px' }}>
+                    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                    <line x1="12" y1="20" x2="12.01" y2="20"></line>
+                  </svg>
+                )}
+              </div>
+            )}
+
             {/* Theme Toggle Switch */}
             <div
               onClick={() => setIsDarkMode(!isDarkMode)}
@@ -257,23 +294,27 @@ export default function RoomHeader({
               {showProfile && (
                 <div style={{
                   position: 'absolute', top: '100%', right: 0, marginTop: '0.5rem',
-                  backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '0.5rem',
+                  backgroundColor: isDarkMode ? '#1f2937' : '#fff', 
+                  border: isDarkMode ? '1px solid #374151' : '1px solid #e2e8f0', 
+                  borderRadius: '0.5rem',
                   boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06)',
                   width: '180px', padding: '1rem', zIndex: 50,
                   display: 'flex', flexDirection: 'column', gap: '0.75rem', textAlign: 'left'
                 }}>
                   <div style={{ display: 'flex', flexDirection: 'column' }}>
-                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: '#1e293b' }}>{userInfo.name}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{userInfo.username}</span>
+                    <span style={{ fontSize: '0.9rem', fontWeight: 600, color: isDarkMode ? '#f8fafc' : '#1e293b' }}>{userInfo.name}</span>
+                    <span style={{ fontSize: '0.75rem', color: isDarkMode ? '#94a3b8' : '#64748b' }}>{userInfo.username}</span>
                   </div>
-                  <hr style={{ border: 'none', borderTop: '1px solid #e2e8f0', margin: 0 }} />
+                  <hr style={{ border: 'none', borderTop: isDarkMode ? '1px solid #374151' : '1px solid #e2e8f0', margin: 0 }} />
                   <button
                     onClick={() => {
                       localStorage.removeItem('token');
                       window.location.href = '/';
                     }}
                     style={{
-                      backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', borderRadius: '0.25rem',
+                      backgroundColor: isDarkMode ? '#450a0a' : '#fee2e2', 
+                      color: isDarkMode ? '#fca5a5' : '#ef4444', 
+                      border: 'none', borderRadius: '0.25rem',
                       padding: '0.4rem', fontSize: '0.8rem', cursor: 'pointer', fontWeight: 500, width: '100%'
                     }}
                   >

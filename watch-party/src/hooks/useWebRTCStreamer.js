@@ -14,7 +14,6 @@ export default function useWebRTCStreamer({
   const [duration, setDuration] = useState(0);
   const [isPaused, setIsPaused] = useState(true);
   const [isScrubbing, setIsScrubbing] = useState(false);
-  const [networkQuality, setNetworkQuality] = useState('Good');
 
   const streamRef = useRef(null);
   const canvasRef = useRef(null);
@@ -48,8 +47,6 @@ export default function useWebRTCStreamer({
 
     mediaElementSourceRef.current = null;
     mediaStreamDestinationRef.current = null;
-
-    setNetworkQuality('Good');
   };
 
   // Cleanup on unmount
@@ -159,21 +156,7 @@ export default function useWebRTCStreamer({
   };
 
   const startStatsMonitoring = (movieStream, isStreamerRole) => {
-    if (statsIntervalRef.current) clearInterval(statsIntervalRef.current);
-
-    statsIntervalRef.current = setInterval(() => {
-      if (!movieStream || movieStream.getTracks().length === 0) {
-        setNetworkQuality('Poor');
-        return;
-      }
-
-      const videoTrack = movieStream.getVideoTracks()[0];
-      if (videoTrack && videoTrack.readyState === 'ended') {
-        setNetworkQuality('Poor');
-      } else {
-        setNetworkQuality('Good');
-      }
-    }, 3000);
+    // Network stats monitoring moved to CallContext to apply globally to all rooms
   };
 
   const handleVideoLoadedMetadata = () => {
@@ -376,7 +359,6 @@ export default function useWebRTCStreamer({
     duration,
     isPaused,
     isScrubbing,
-    networkQuality,
     handleFileChange,
     applyHighQualitySenderSettings,
     startStatsMonitoring,

@@ -34,7 +34,7 @@ export default function WebRTCRoom() {
     videoRef, videoUrlRef, fileName, isStreamer, currentTime, duration, 
     isPaused, handleFileChange, handleVideoLoadedMetadata, 
     handleTimeUpdate, handlePlayPauseEvent, handleWaiting, 
-    togglePlayPause, handleSeek, formatTime, setIsScrubbing 
+    togglePlayPause, handleSeek, formatTime, setIsScrubbing, networkQuality
   } = useWebRTCStreamer({ 
     isConnected, sendData, subscribeToData, startMovieShare, stopMovieShare, movieCallRef
   });
