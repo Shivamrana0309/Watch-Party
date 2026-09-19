@@ -11,6 +11,7 @@ import { useCallContext } from "../context/CallContext";
 import { useNavigate } from "react-router-dom";
 import RoomHeader from "../components/RoomHeader";
 import IncomingCallModal from "../components/IncomingCallModal";
+import { useVolumeMeter } from "../hooks/useVolumeMeter";
 import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 export default function LocalSyncRoom() {
@@ -96,36 +97,7 @@ export default function LocalSyncRoom() {
   }, [handleReceiveData, subscribeToData]);
 
   // Volume Bar Logic
-  useEffect(() => {
-    let audioContext, analyser, source, animationFrameId;
-    if (localStream && user1Media.mic) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioContext = new AudioContext();
-      analyser = audioContext.createAnalyser();
-      analyser.smoothingTimeConstant = 0.7;
-      analyser.fftSize = 256;
-
-      source = audioContext.createMediaStreamSource(localStream);
-      source.connect(analyser);
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const updateVolume = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const average = sum / dataArray.length;
-        if (volumeBarRef.current) volumeBarRef.current.style.height = `${Math.min(average * 1.5, 100)}%`;
-        animationFrameId = requestAnimationFrame(updateVolume);
-      };
-      updateVolume();
-    } else if (volumeBarRef.current) {
-      volumeBarRef.current.style.height = "0%";
-    }
-    return () => {
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
-      if (audioContext && audioContext.state !== "closed") audioContext.close();
-    };
-  }, [localStream, user1Media.mic]);
+  useVolumeMeter(localStream, user1Media.mic, volumeBarRef);
 
   // Helper to format seconds into M:SS
   const formatTime = (timeInSeconds) => {

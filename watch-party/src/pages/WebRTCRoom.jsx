@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useCallContext } from '../context/CallContext';
 import RoomHeader from '../components/RoomHeader';
 import IncomingCallModal from '../components/IncomingCallModal';
+import { useVolumeMeter } from '../hooks/useVolumeMeter';
 import DraggableVideoFeeds from '../components/DraggableVideoFeeds';
 import useWebRTCStreamer from '../hooks/useWebRTCStreamer';
 import VideoPlayerControls from '../components/VideoPlayerControls';
@@ -88,36 +89,7 @@ export default function WebRTCRoom() {
   }, [remoteStream]);
 
   // Volume Bar Logic
-  useEffect(() => {
-    let audioContext, analyser, source, animationFrameIdLocal;
-    if (localStream && user1Media.mic) {
-      const AudioContext = window.AudioContext || window.webkitAudioContext;
-      audioContext = new AudioContext();
-      analyser = audioContext.createAnalyser();
-      analyser.smoothingTimeConstant = 0.7;
-      analyser.fftSize = 256;
-
-      source = audioContext.createMediaStreamSource(localStream);
-      source.connect(analyser);
-
-      const dataArray = new Uint8Array(analyser.frequencyBinCount);
-      const updateVolume = () => {
-        analyser.getByteFrequencyData(dataArray);
-        let sum = 0;
-        for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const average = sum / dataArray.length;
-        if (volumeBarRef.current) volumeBarRef.current.style.height = `${Math.min(average * 1.5, 100)}%`;
-        animationFrameIdLocal = requestAnimationFrame(updateVolume);
-      };
-      updateVolume();
-    } else if (volumeBarRef.current) {
-      volumeBarRef.current.style.height = "0%";
-    }
-    return () => {
-      if (animationFrameIdLocal) cancelAnimationFrame(animationFrameIdLocal);
-      if (audioContext && audioContext.state !== "closed") audioContext.close();
-    };
-  }, [localStream, user1Media.mic]);
+  useVolumeMeter(localStream, user1Media.mic, volumeBarRef);
 
   // ── Attach remote movie stream to the main video player ──
   useEffect(() => {
