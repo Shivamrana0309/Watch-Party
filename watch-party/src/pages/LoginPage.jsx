@@ -49,7 +49,7 @@ export default function LoginPage({ onLoginSuccess, onNavigateSignup }) {
                 localStorage.setItem('token', data.token); // Save JWT token
                 
                 if (roomCode.trim()) {
-                    navigate(`/room/${roomCode.trim()}`);
+                    navigate(`/party/${roomCode.trim()}`);
                 } else {
                     onLoginSuccess(); // Default authenticated view
                 }
