@@ -11,6 +11,7 @@ import { useNavigate } from "react-router-dom";
 import RoomHeader from "../components/RoomHeader";
 import IncomingCallModal from "../components/IncomingCallModal";
 import { useVolumeMeter } from "../hooks/useVolumeMeter";
+import { useAttachVideoDOM } from "../hooks/useAttachVideoDOM";
 import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
 const EXTRA_DARK_CSS = `
@@ -80,21 +81,17 @@ export default function YouTubeRoom() {
   });
 
   // Stream playback logic - Append persistent DOM nodes
-  useEffect(() => {
-    if (localVideoRef.current && localVideoDOM) {
-      localVideoRef.current.appendChild(localVideoDOM);
-      localVideoDOM.className = `video-feed video-feed--local ${user1Media.cam ? "is-visible" : "is-hidden"}`;
-      localVideoDOM.play().catch(() => {});
-    }
-  }, [localVideoDOM, user1Media.cam]);
+  useAttachVideoDOM(
+    localVideoRef,
+    localVideoDOM,
+    `video-feed video-feed--local ${user1Media.cam ? "is-visible" : "is-hidden"}`
+  );
 
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteVideoDOM) {
-      remoteVideoRef.current.appendChild(remoteVideoDOM);
-      remoteVideoDOM.className = `video-feed video-feed--remote ${user2Media.cam ? "is-visible" : "is-hidden"}`;
-      remoteVideoDOM.play().catch(() => {});
-    }
-  }, [remoteVideoDOM, user2Media.cam]);
+  useAttachVideoDOM(
+    remoteVideoRef,
+    remoteVideoDOM,
+    `video-feed video-feed--remote ${user2Media.cam ? "is-visible" : "is-hidden"}`
+  );
 
   // Subscribe to generic data for WatchPartyVideo sync
   useEffect(() => {

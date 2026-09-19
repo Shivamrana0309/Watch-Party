@@ -9,6 +9,7 @@ import { useCallContext } from "../context/CallContext";
 import { useNavigate } from "react-router-dom";
 import RoomHeader from "../components/RoomHeader";
 import { useVolumeMeter } from "../hooks/useVolumeMeter";
+import { useAttachVideoDOM } from "../hooks/useAttachVideoDOM";
 import IncomingCallModal from "../components/IncomingCallModal";
 import DraggableVideoFeeds from "../components/DraggableVideoFeeds";
 
@@ -52,21 +53,17 @@ export default function ScreenShareRoom() {
   } = useCallContext();
 
   // Stream playback logic - Append persistent DOM nodes
-  useEffect(() => {
-    if (localVideoRef.current && localVideoDOM) {
-      localVideoRef.current.appendChild(localVideoDOM);
-      localVideoDOM.className = `video-feed video-feed--local ${user1Media.cam ? "is-visible" : "is-hidden"}`;
-      localVideoDOM.play().catch(() => {});
-    }
-  }, [localVideoDOM, user1Media.cam]);
+  useAttachVideoDOM(
+    localVideoRef,
+    localVideoDOM,
+    `video-feed video-feed--local ${user1Media.cam ? "is-visible" : "is-hidden"}`
+  );
 
-  useEffect(() => {
-    if (remoteVideoRef.current && remoteVideoDOM) {
-      remoteVideoRef.current.appendChild(remoteVideoDOM);
-      remoteVideoDOM.className = `video-feed video-feed--remote ${user2Media.cam ? "is-visible" : "is-hidden"}`;
-      remoteVideoDOM.play().catch(() => {});
-    }
-  }, [remoteVideoDOM, user2Media.cam]);
+  useAttachVideoDOM(
+    remoteVideoRef,
+    remoteVideoDOM,
+    `video-feed video-feed--remote ${user2Media.cam ? "is-visible" : "is-hidden"}`
+  );
 
   // Volume Bar Logic
   useVolumeMeter(localStream, user1Media.mic, volumeBarRef);
